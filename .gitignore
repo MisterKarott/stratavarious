@@ -3,9 +3,3 @@
 *.swo
 *~
 node_modules/
-
-# Dev files (local only)
-CLAUDE.md
-HANDOFF.md
-MEMORY.md
-memory/
