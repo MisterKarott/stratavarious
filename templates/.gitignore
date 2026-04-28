@@ -1,0 +1,11 @@
+# Raw session captures — never committed
+session-buffer.md
+
+# OS artifacts
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Backups from merge
+*.pre-stratavarious.bak
