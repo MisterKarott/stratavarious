@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
-  <img src="https://img.shields.io/badge/version-1.0.0-6c5ce7?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
 </p>
 
@@ -139,7 +139,7 @@ The entire vault is a git repository. Every consolidation creates a commit. You 
 ## Installation
 
 ```bash
-claude plugin install github.com/MisterK/stratavarious
+claude plugin install github.com/MisterKarott/stratavarious
 ```
 
 ## Quick Start

@@ -16,7 +16,7 @@ Everything lives in the StrataVarious workspace directory:
 
 ```
 StrataVarious/
-├── scripts/
+├── hooks/
 │   └── stratavarious-stop.js          ← Stop hook (auto-captures session data)
 ├── memory/
 │   ├── STRATAVARIOUS.md               ← Working memory (last 3 sessions)
@@ -68,9 +68,9 @@ This command runs the full consolidation pipeline. It replaces `/handoff` — pr
 
 Before any consolidation, ask the user:
 
-> *"Y a-t-il des intentions ou prochaines étapes à noter pour la prochaine session ?"*
+> *"Any intentions or next steps to note for the next session?"*
 
-Wait for the response. It can be a sentence, a list, or "rien". This answer feeds directly into the `**Next steps:**` field of the session summary. If the user has nothing to add, write `none`.
+Wait for the response. It can be a sentence, a list, or "nothing". This answer feeds directly into the `**Next steps:**` field of the session summary. If the user has nothing to add, write `none`.
 
 ### Phase 1 — Read (dual source)
 
@@ -171,23 +171,38 @@ Why frontmatter matters: it enables filtering and classification. A note with `c
 
 ### Phase 6 — Git commit
 
-First, check if `gitleaks` is installed:
+Before committing, run a secret detection scan. This is mandatory — no commits without verification.
+
+**Step 1: Check for gitleaks**
 
 ```bash
 command -v gitleaks >/dev/null 2>&1 && echo "available" || echo "not_installed"
 ```
 
-If `gitleaks` is **available**, run secret detection on the vault before committing:
+If `gitleaks` is **available**, run it on the vault:
 
 ```bash
 cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory" && gitleaks detect --source . --no-git --exit-code 0
 ```
 
-If secrets are detected, warn the user and abort the commit. This is a security checkpoint — no commits with leaked credentials.
+If secrets are detected, warn the user and **abort the commit**. This is a hard block — no exceptions.
 
-If `gitleaks` is **not installed**, skip the secret scan but warn the user: `"gitleaks not found — secret scan skipped. Install with: brew install gitleaks"`. Proceed with the commit.
+If `gitleaks` is **not installed**, run the inline regex secret scan instead (Step 2).
 
-If clean, proceed with the commit:
+**Step 2: Inline regex secret scan (fallback when gitleaks is absent)**
+
+```bash
+cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory"
+grep -rEn '(sk-[a-zA-Z0-9]{20,}|pk_[a-z]+_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|password\s*[=:]\s*\S+|api_key\s*[=:]\s*\S+|secret\s*[=:]\s*\S+|token\s*[=:]\s*\S+|bearer\s+[a-zA-Z0-9._-]+|(mongodb|postgres|mysql|redis)://[^:]+:[^@]+@)' vault/ --include='*.md' || echo "CLEAN"
+```
+
+If output is anything other than `CLEAN`, warn the user and **abort the commit**.
+
+Also warn: `"gitleaks not found — used inline regex scan instead. Install for full coverage: brew install gitleaks"`
+
+**Step 3: Commit**
+
+If both scans pass (or inline scan is clean), proceed:
 
 ```bash
 cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}" && git add -A && git commit -m "stratavarious: [identifier]"
@@ -208,7 +223,7 @@ Empty `session-buffer.md`. Keep only the header:
 
 ### What to retain
 
-- Explicit user preferences ("je préfère pnpm") or implicit ones (detected through usage)
+- Explicit user preferences ("I prefer pnpm") or implicit ones (detected through usage)
 - User corrections ("non, fais plutôt comme ça")
 - Project conventions (naming, structure, tools)
 - Environment facts (OS, stack, config)

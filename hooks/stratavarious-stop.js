@@ -10,7 +10,39 @@ const { execSync } = require('child_process');
 
 const STRATAVARIOUS_HOME = process.env.STRATAVARIOUS_HOME || path.join(os.homedir(), '.claude', 'workspace', 'stratavarious');
 const BUFFER_PATH = path.join(STRATAVARIOUS_HOME, 'memory', 'session-buffer.md');
-const MAX_BUFFER_SIZE = 500 * 1024; // 500KB
+const MAX_BUFFER_SIZE = parseInt(process.env.STRATAVARIOUS_MAX_BUFFER, 10) || (500 * 1024);
+
+// Regex patterns for secret scrubbing — applied before any disk write
+const SECRET_PATTERNS = [
+  // API keys with prefixes
+  /\b(sk-[a-zA-Z0-9]{20,})\b/g,
+  /\b(pk_[a-z]+_[a-zA-Z0-9]{20,})\b/g,
+  /\b(ak_[a-zA-Z0-9]{20,})\b/g,
+  /\b(rk_[a-zA-Z0-9]{20,})\b/g,
+  // Generic key=value credentials
+  /\b(password|passwd|pwd|secret|token|api_key|apikey|access_key|private_key|auth_token|refresh_token|bearer)\s*[=:]\s*['"]?([^\s'"]{8,})['"]?/gi,
+  // AWS-style keys
+  /\b(AKIA[A-Z0-9]{16})\b/g,
+  // Generic hex/base64 tokens (standalone, 32+ chars)
+  /\b([a-f0-9]{40,})\b/gi,
+  // Connection strings with embedded passwords
+  /\b(mongodb|postgres|mysql|redis|amqp)(\+[a-z]+)?:\/\/[^:]+:([^@]+)@/gi,
+  // Bearer tokens in headers
+  /\b[Aa]uthorization\s*:\s*[Bb]earer\s+\S+/g,
+  // X-API-Key headers
+  /\bx-api-key\s*:\s*\S+/gi,
+];
+
+function scrubSecrets(text) {
+  let cleaned = text;
+  for (const pattern of SECRET_PATTERNS) {
+    cleaned = cleaned.replace(pattern, (match) => {
+      if (match.length <= 8) return '[REDACTED]';
+      return match.substring(0, 4) + '...' + '[REDACTED]';
+    });
+  }
+  return cleaned;
+}
 
 function getProjectName(cwd) {
   const basename = path.basename(cwd);
@@ -172,6 +204,9 @@ function main() {
   }
 
   entry += '\n';
+
+  // Scrub secrets before any disk write
+  entry = scrubSecrets(entry);
 
   // Guard buffer size
   truncateBuffer();

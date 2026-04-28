@@ -35,7 +35,7 @@ for i in "${!VAULT_FILES[@]}"; do
   SIZE1=$(stat -f%z "$FILE1" 2>/dev/null || stat -c%s "$FILE1" 2>/dev/null)
   HASH1=$(md5sum "$FILE1" 2>/dev/null | cut -d' ' -f1 || md5 "$FILE1" | cut -d' ' -f4)
 
-  for j in $(seq $((i + 1)) ${#VAULT_FILES[@]}); do
+  for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
     FILE2="${VAULT_FILES[$j]}"
     SIZE2=$(stat -f%z "$FILE2" 2>/dev/null || stat -c%s "$FILE2" 2>/dev/null)
 
@@ -59,7 +59,7 @@ for i in "${!VAULT_FILES[@]}"; do
   FILE1="${VAULT_FILES[$i]}"
   TITLE1=$(grep -m1 '^# ' "$FILE1" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || echo "")
 
-  for j in $(seq $((i + 1)) ${#VAULT_FILES[@]}); do
+  for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
     FILE2="${VAULT_FILES[$j]}"
     TITLE2=$(grep -m1 '^# ' "$FILE2" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || echo "")
 
