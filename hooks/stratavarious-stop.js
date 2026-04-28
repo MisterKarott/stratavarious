@@ -44,6 +44,11 @@ function scrubSecrets(text) {
   return cleaned;
 }
 
+// Strip invisible/suspicious Unicode characters
+function stripInvisibleUnicode(text) {
+  return text.replace(/[​-‏ - ﻿­]/g, '');
+}
+
 function getProjectName(cwd) {
   const basename = path.basename(cwd);
   if (basename === '.' || basename === '/' || basename === '~') return 'unknown';
@@ -174,7 +179,7 @@ function main() {
 
   // Build structured entry
   let entry = `\n## ${timestamp}\n`;
-  entry += `- **projet:** ${project}\n`;
+  entry += `- **project:** ${project}\n`;
   entry += `- **cwd:** ${cwd}\n`;
 
   // User intent (most recent user message)
@@ -205,8 +210,9 @@ function main() {
 
   entry += '\n';
 
-  // Scrub secrets before any disk write
+  // Scrub secrets and invisible Unicode before any disk write
   entry = scrubSecrets(entry);
+  entry = stripInvisibleUnicode(entry);
 
   // Guard buffer size
   truncateBuffer();

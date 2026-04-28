@@ -11,7 +11,7 @@ Never start a session from zero again.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-active-success?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Made%20by-MisterK-ff6b6b?style=flat-square" alt="Author">
+  <img src="https://img.shields.io/badge/Made%20by-MisterKarott-ff6b6b?style=flat-square" alt="Author">
 </p>
 
 ---
@@ -232,4 +232,4 @@ Override by setting the environment variable before starting Claude Code.
 
 ## License
 
-[MIT](LICENSE) &copy; MisterK
+[MIT](LICENSE) &copy; MisterKarott

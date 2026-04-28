@@ -1,0 +1,31 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate plugin.json
+        run: |
+          python3 -c "import json; json.load(open('.claude-plugin/plugin.json'))"
+          echo "plugin.json is valid JSON"
+
+      - name: Validate package.json
+        run: |
+          python3 -c "import json; json.load(open('package.json'))"
+          echo "package.json is valid JSON"
+
+      - name: Shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+
+      - name: Node version check
+        run: |
+          node -v
+          # Verify hook runs without errors (dry test)
+          echo '{}' | node hooks/stratavarious-stop.js
+          echo "Hook executed without crash"

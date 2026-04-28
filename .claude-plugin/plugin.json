@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "description": "Persistent memory system for Claude Code — session consolidation, vault, and cross-session knowledge",
   "author": {
-    "name": "MisterK"
+    "name": "MisterKarott"
   },
   "license": "MIT",
   "repository": "https://github.com/MisterKarott/stratavarious",

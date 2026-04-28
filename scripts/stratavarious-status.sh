@@ -8,12 +8,19 @@ STRATAVARIOUS_MD="$MEMORY_DIR/STRATAVARIOUS.md"
 
 echo "--- StrataVarious Status ---"
 
+# Guard: check vault exists
+if [ ! -d "$VAULT_DIR" ]; then
+  echo "Vault not initialized. Run setup.sh first."
+  echo "--- End StrataVarious Status ---"
+  exit 1
+fi
+
 # 1. Number of notes in vault/
 NUM_VAULT_NOTES=$(find "$VAULT_DIR" -type f -name "*.md" | wc -l | tr -d ' ')
 echo "Notes in vault: $NUM_VAULT_NOTES"
 
 # 2. Size of vault/
-VAULT_SIZE=$(du -sh "$VAULT_DIR" | awk '{print $1}')
+VAULT_SIZE=$(du -sh "$VAULT_DIR" 2>/dev/null | awk '{print $1}')
 echo "Vault size: $VAULT_SIZE"
 
 # 3. Last consolidation date

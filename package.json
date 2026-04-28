@@ -1,0 +1,17 @@
+{
+  "name": "stratavarious",
+  "version": "1.2.0",
+  "description": "Persistent memory system for Claude Code — session consolidation, vault, and cross-session knowledge",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "hooks/",
+    "scripts/",
+    "skills/",
+    "templates/",
+    ".claude-plugin/"
+  ],
+  "license": "MIT"
+}
