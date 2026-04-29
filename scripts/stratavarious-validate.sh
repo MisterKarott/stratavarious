@@ -36,6 +36,12 @@ validate_file() {
     ERRORS=$((ERRORS + 1))
     return
   fi
+  # Guard: fm_end must be at least 2 (opening line + content + closing line)
+  if [ "$fm_end" -lt 2 ]; then
+    echo "FAIL $basename — invalid frontmatter (too short)"
+    ERRORS=$((ERRORS + 1))
+    return
+  fi
 
   local fm
   fm=$(head -$((fm_end - 1)) "$file" | tail -n +2)
@@ -44,9 +50,12 @@ validate_file() {
   local date categorie tags
   date=$(echo "$fm" | sed -n 's/^date:[[:space:]]*\(.*\)$/\1/p')
   categorie=$(echo "$fm" | sed -n 's/^categorie:[[:space:]]*\(.*\)$/\1/p')
-  # Accept both 'categorie' and 'category' for backward compat
+  # Accept both 'categorie' (deprecated) and 'category' for backward compat
   if [ -z "$categorie" ]; then
     categorie=$(echo "$fm" | sed -n 's/^category:[[:space:]]*\(.*\)$/\1/p')
+  else
+    # Warn about deprecated 'categorie' field
+    echo "WARN $basename — using deprecated 'categorie' field, use 'category' instead"
   fi
   tags=$(echo "$fm" | sed -n 's/^tags:[[:space:]]*\(.*\)$/\1/p')
 
@@ -59,10 +68,10 @@ validate_file() {
   fi
 
   if [ -z "$categorie" ]; then
-    echo "FAIL $basename — missing categorie/category"
+    echo "FAIL $basename — missing category"
     ERRORS=$((ERRORS + 1))
   elif ! echo " $VALID_CATEGORIES " | grep -q " $categorie "; then
-    echo "FAIL $basename — invalid categorie: $categorie"
+    echo "FAIL $basename — invalid category: $categorie"
     ERRORS=$((ERRORS + 1))
   fi
 

@@ -42,7 +42,7 @@ echo ""
 declare -a HASHES TITLES
 for f in "${VAULT_FILES[@]}"; do
   HASHES+=("$(file_hash "$f")")
-  TITLES+=("$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || echo "")")
+  TITLES+=("$( { grep -m1 '^# ' "$f" 2>/dev/null || true; } | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ')")
 done
 
 # Check for exact duplicates based on content hash

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail  # No -e because some greps may return 1 normally
 
 STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
 MEMORY_DIR="$STRATAVARIOUS_HOME/memory"
@@ -38,7 +39,7 @@ echo "Last session consolidated: $LAST_CONSOLIDATION_DATE"
 if [ ! -f "$SESSION_BUFFER" ]; then
   echo "Session buffer: Not found (run setup first)"
 else
-  NUM=$(grep -cE '^## ' "$SESSION_BUFFER" 2>/dev/null || echo 0)
+  NUM=$(grep -cE '^## ' "$SESSION_BUFFER" 2>/dev/null) || NUM=0
   if [ "$NUM" -eq 0 ]; then
     echo "Session buffer: Empty"
   else

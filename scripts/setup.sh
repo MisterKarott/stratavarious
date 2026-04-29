@@ -60,8 +60,20 @@ fi
 
 # 4. Initialize Git in memory/
 if [ ! -d "$MEMORY_DIR/.git" ]; then
-  git init -b main "$MEMORY_DIR"
-  echo "Initialized git repository"
+  # Try git init -b main (Git >= 2.28), fallback for older versions
+  if (cd "$MEMORY_DIR" && git init -b main) 2>/dev/null; then
+    echo "Initialized git repository"
+  else
+    (cd "$MEMORY_DIR" && git init && git symbolic-ref HEAD refs/heads/main) 2>/dev/null || \
+      (cd "$MEMORY_DIR" && git init && git checkout -b main) 2>/dev/null || \
+      { cd "$MEMORY_DIR" && git init; echo "  (defaulted to master branch, manual rename to main recommended)"; }
+    echo "Initialized git repository"
+  fi
+  # Configure default user for auto-commits if not set globally
+  if ! git config --global user.email >/dev/null 2>&1; then
+    git config --local user.email "stratavarious@local"
+    git config --local user.name "StrataVarious"
+  fi
 else
   echo "Git repository already exists"
 fi

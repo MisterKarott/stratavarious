@@ -14,17 +14,38 @@ const _parsed = parseInt(process.env.STRATAVARIOUS_MAX_BUFFER, 10);
 const MAX_BUFFER_SIZE = (Number.isFinite(_parsed) && _parsed > 0) ? _parsed : (500 * 1024);
 
 // Secret scrubbing patterns — labeled patterns keep the label prefix
+// Note: The label patterns (password|secret|...) may match benign text like "the secret to success is"
+// This is acceptable (false positives preferred over false negatives).
 const LABELED_PATTERNS = [
   { re: /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g },
-  { re: /\b(x-api-key\s*:\s*)(\S+)/gi },
+  { re: /(x-api-key|Authorization\\s\*:\\s\*):\s\*)(\S\+)/gi },
   { re: /\b(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*[=:]\s*)['"]?([^\s'"]{8,})['"]?/gi },
 ];
 const SIMPLE_PATTERNS = [
-  /\b(sk-[a-zA-Z0-9]{20,})\b/g,
+  // Stripe
+  /\b(sk-[a-zA-Z0-9]{17,})\b/g,
+  /\b(sk_live_[a-zA-Z0-9]{17,})\b/g,
+  /\b(sk_test_[a-zA-Z0-9]{17,})\b/g,
+  // OpenAI / Anthropic
+  /\b(sk-[a-zA-Z0-9]{20,})\b/g,  // duplicate kept for coverage
+  /\b(sk-ant-[a-zA-Z0-9]{20,})\b/g,
+  // AWS
+  /\b(AKIA[A-Z0-9]{16})\b/g,
+  /\b(ASIA[A-Z0-9]{16})\b/g,
+  // Other keys
   /\b(pk_[a-z]+_[a-zA-Z0-9]{20,})\b/g,
   /\b(ak_[a-zA-Z0-9]{20,})\b/g,
   /\b(rk_[a-zA-Z0-9]{20,})\b/g,
-  /\b(AKIA[A-Z0-9]{16})\b/g,
+  // GitHub tokens
+  /\bghp_[A-Za-z0-9]{36,}\b/g,
+  /\bgh[souru]_[A-Za-z0-9]{36,}\b/g,
+  /\bgho_[A-Za-z0-9]{36,}\b/g,
+  // Slack
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g,
+  // Google API
+  /\bAIza[0-9A-Za-z_-]{35,}\b/g,
+  // JWT
+  /\beyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_.+/=-]+\b/g,
 ];
 
 // Connection strings — handled separately to preserve user/host context
@@ -41,12 +62,14 @@ function scrubSecrets(text) {
   // Labeled patterns: keep the label prefix, redact the secret
   for (const { re } of LABELED_PATTERNS) {
     cleaned = cleaned.replace(re, (match, ...args) => {
-      // For 3-group pattern (key=value), reconstruct label + separator
-      if (args.length >= 3 && typeof args[0] === 'string' && typeof args[1] === 'string' && typeof args[2] === 'string') {
+      // args[0] = label/prefix, args[1] = separator (for 3-group), args[2] = value (for 3-group)
+      // Check if we have a 3rd capture group that is a string (key=value pattern)
+      if (typeof args[2] === 'string') {
+        // 3-group pattern (key=value)
         return args[0] + args[1] + '[REDACTED]';
       }
-      // For 2-group patterns (Bearer/X-API-Key), keep label
-      if (args.length >= 2 && typeof args[0] === 'string' && typeof args[1] === 'string') {
+      // 2-group pattern (Bearer / X-API-Key)
+      if (typeof args[0] === 'string') {
         return args[0] + '[REDACTED]';
       }
       return '[REDACTED]';
@@ -96,7 +119,6 @@ function getModifiedFiles(dir) {
 }
 
 // Read the last N lines of a file (bounded to 256 KiB to avoid reading huge transcripts)
-function readLastNLines(filePath, n) {
   try {
     const stat = fs.statSync(filePath);
     const readSize = Math.min(stat.size, 256 * 1024);
@@ -104,7 +126,10 @@ function readLastNLines(filePath, n) {
     const buf = Buffer.alloc(readSize);
     fs.readSync(fd, buf, 0, readSize, stat.size - readSize);
     fs.closeSync(fd);
-    return buf.toString('utf8').split('\n').slice(-n);
+    const startedAtBeginning = (stat.size - readSize) === 0;
+    const out = buf.toString('utf8').split('\n');
+    if (!startedAtBeginning) out.shift(); // drop partial first line
+    return out.slice(-n);
   } catch {
     return [];
   }
@@ -188,6 +213,9 @@ function truncateBuffer() {
 }
 
 function main() {
+  // Allow disabling via env var
+  if (process.env.STRATAVARIOUS_DISABLE === '1') process.exit(0);
+
   const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
   let cwd = process.cwd();
   let transcriptPath = null;
