@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
 MEMORY_DIR="$STRATAVARIOUS_HOME/memory"
@@ -7,25 +8,19 @@ VAULT_DIR="$MEMORY_DIR/vault"
 echo "--- StrataVarious Vault Cleaning ---"
 echo ""
 
-# Detect hash command once
-if command -v md5sum >/dev/null 2>&1; then
-  HASH_CMD="md5sum"
-else
-  HASH_CMD="md5 -q"
-fi
-
 file_hash() {
-  if [ "$HASH_CMD" = "md5sum" ]; then
-    md5sum "$1" | cut -d' ' -f1
-  else
+  if command -v md5sum >/dev/null 2>&1; then
+    md5sum "$1" | awk '{print $1}'
+  elif command -v md5 >/dev/null 2>&1; then
     md5 -q "$1"
+  else
+    shasum "$1" | awk '{print $1}'
   fi
 }
 
-# Collect all vault files (excluding journal for now)
+# Collect all vault files (excluding journal)
 VAULT_FILES=()
 while IFS= read -r -d '' file; do
-  # Skip journal files
   if [[ "$file" =~ /journal/ ]]; then
     continue
   fi
@@ -43,22 +38,23 @@ for file in "${VAULT_FILES[@]}"; do
 done
 echo ""
 
-# Check for potential duplicates based on file size and content hash
+# Pre-compute hashes and titles to avoid O(n²) re-computation
+declare -a HASHES TITLES
+for f in "${VAULT_FILES[@]}"; do
+  HASHES+=("$(file_hash "$f")")
+  TITLES+=("$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || echo "")")
+done
+
+# Check for exact duplicates based on content hash
 DUPLICATES_FOUND=0
 for i in "${!VAULT_FILES[@]}"; do
-  FILE1="${VAULT_FILES[$i]}"
-  HASH1=$(file_hash "$FILE1")
-
+  HASH1="${HASHES[$i]}"
   for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
-    FILE2="${VAULT_FILES[$j]}"
-
-    # Check if files are identical (same hash)
-    HASH2=$(file_hash "$FILE2")
-
+    HASH2="${HASHES[$j]}"
     if [ "$HASH1" = "$HASH2" ]; then
       echo "⚠️  Exact duplicate detected:"
-      echo "   $(basename "$FILE1")"
-      echo "   $(basename "$FILE2")"
+      echo "   $(basename "${VAULT_FILES[$i]}")"
+      echo "   $(basename "${VAULT_FILES[$j]}")"
       echo "   Action: Delete one of them"
       echo ""
       DUPLICATES_FOUND=1
@@ -66,20 +62,16 @@ for i in "${!VAULT_FILES[@]}"; do
   done
 done
 
-# Check for similar titles/categories
+# Check for similar titles
 echo "Checking for similar topics..."
 for i in "${!VAULT_FILES[@]}"; do
-  FILE1="${VAULT_FILES[$i]}"
-  TITLE1=$(grep -m1 '^# ' "$FILE1" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || echo "")
-
+  TITLE1="${TITLES[$i]}"
   for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
-    FILE2="${VAULT_FILES[$j]}"
-    TITLE2=$(grep -m1 '^# ' "$FILE2" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || echo "")
-
+    TITLE2="${TITLES[$j]}"
     if [ -n "$TITLE1" ] && [ -n "$TITLE2" ] && [ "$TITLE1" = "$TITLE2" ]; then
       echo "⚠️  Similar title detected:"
-      echo "   $(basename "$FILE1") - $TITLE1"
-      echo "   $(basename "$FILE2") - $TITLE2"
+      echo "   $(basename "${VAULT_FILES[$i]}") - $TITLE1"
+      echo "   $(basename "${VAULT_FILES[$j]}") - $TITLE2"
       echo "   Action: Review and merge if covering same topic"
       echo ""
       DUPLICATES_FOUND=1

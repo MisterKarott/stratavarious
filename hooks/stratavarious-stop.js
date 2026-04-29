@@ -10,23 +10,21 @@ const { execSync } = require('child_process');
 
 const STRATAVARIOUS_HOME = process.env.STRATAVARIOUS_HOME || path.join(os.homedir(), '.claude', 'workspace', 'stratavarious');
 const BUFFER_PATH = path.join(STRATAVARIOUS_HOME, 'memory', 'session-buffer.md');
-const MAX_BUFFER_SIZE = parseInt(process.env.STRATAVARIOUS_MAX_BUFFER, 10) || (500 * 1024);
+const _parsed = parseInt(process.env.STRATAVARIOUS_MAX_BUFFER, 10);
+const MAX_BUFFER_SIZE = (Number.isFinite(_parsed) && _parsed > 0) ? _parsed : (500 * 1024);
 
-// Regex patterns for secret scrubbing — applied before any disk write
-const SECRET_PATTERNS = [
-  // API keys with prefixes
+// Secret scrubbing patterns — labeled patterns keep the label prefix
+const LABELED_PATTERNS = [
+  { re: /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g },
+  { re: /\b(x-api-key\s*:\s*)(\S+)/gi },
+  { re: /\b(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*[=:]\s*)['"]?([^\s'"]{8,})['"]?/gi },
+];
+const SIMPLE_PATTERNS = [
   /\b(sk-[a-zA-Z0-9]{20,})\b/g,
   /\b(pk_[a-z]+_[a-zA-Z0-9]{20,})\b/g,
   /\b(ak_[a-zA-Z0-9]{20,})\b/g,
   /\b(rk_[a-zA-Z0-9]{20,})\b/g,
-  // Generic key=value credentials
-  /\b(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)\s*[=:]\s*['"]?([^\s'"]{8,})['"]?/gi,
-  // AWS-style keys
   /\b(AKIA[A-Z0-9]{16})\b/g,
-  // Bearer tokens in headers — preserve label, redact only the token
-  /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g,
-  // X-API-Key headers — preserve label, redact only the key
-  /\b(x-api-key\s*:\s*)(\S+)/gi,
 ];
 
 // Connection strings — handled separately to preserve user/host context
@@ -40,12 +38,24 @@ function scrubSecrets(text) {
     return match.replace(':' + pwd + '@', ':[REDACTED]@');
   });
 
-  for (const pattern of SECRET_PATTERNS) {
-    cleaned = cleaned.replace(pattern, (match, ...args) => {
-      // Bearer / X-API-Key: args[0]=label, args[1]=secret
+  // Labeled patterns: keep the label prefix, redact the secret
+  for (const { re } of LABELED_PATTERNS) {
+    cleaned = cleaned.replace(re, (match, ...args) => {
+      // For 3-group pattern (key=value), reconstruct label + separator
+      if (args.length >= 3 && typeof args[0] === 'string' && typeof args[1] === 'string' && typeof args[2] === 'string') {
+        return args[0] + args[1] + '[REDACTED]';
+      }
+      // For 2-group patterns (Bearer/X-API-Key), keep label
       if (args.length >= 2 && typeof args[0] === 'string' && typeof args[1] === 'string') {
         return args[0] + '[REDACTED]';
       }
+      return '[REDACTED]';
+    });
+  }
+
+  // Simple patterns: redact entire match
+  for (const pattern of SIMPLE_PATTERNS) {
+    cleaned = cleaned.replace(pattern, (match) => {
       if (match.length <= 8) return '[REDACTED]';
       return match.substring(0, 4) + '...' + '[REDACTED]';
     });
@@ -85,12 +95,16 @@ function getModifiedFiles(dir) {
   }
 }
 
-// Read the last N lines of a file efficiently
+// Read the last N lines of a file (bounded to 256 KiB to avoid reading huge transcripts)
 function readLastNLines(filePath, n) {
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.trim().split('\n');
-    return lines.slice(-n);
+    const stat = fs.statSync(filePath);
+    const readSize = Math.min(stat.size, 256 * 1024);
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(readSize);
+    fs.readSync(fd, buf, 0, readSize, stat.size - readSize);
+    fs.closeSync(fd);
+    return buf.toString('utf8').split('\n').slice(-n);
   } catch {
     return [];
   }
@@ -108,13 +122,27 @@ function extractFromTranscript(lines) {
       const entry = JSON.parse(line);
 
       // User messages — capture intent
-      if (entry.type === 'human' && entry.message?.content) {
-        const text = typeof entry.message.content === 'string'
-          ? entry.message.content
-          : Array.isArray(entry.message.content)
-            ? entry.message.content.filter(c => c.type === 'text').map(c => c.text).join(' ')
-            : '';
-        if (text.trim()) userMessages.push(text.trim().substring(0, 300));
+      if (entry.type === 'user' && entry.message?.content) {
+        const content = entry.message.content;
+        if (typeof content === 'string') {
+          userMessages.push(content.trim().substring(0, 300));
+        } else if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'tool_result') {
+              const text = typeof block.content === 'string'
+                ? block.content
+                : Array.isArray(block.content)
+                  ? block.content.filter(c => c.type === 'text').map(c => c.text).join(' ')
+                  : '';
+              const isError = block.is_error === true || /\b(error|failed|exception|traceback)\b/i.test(text);
+              if (isError) {
+                errors.push(text.substring(0, 300));
+              }
+            } else if (block.type === 'text' && block.text) {
+              userMessages.push(block.text.trim().substring(0, 300));
+            }
+          }
+        }
       }
 
       // Assistant tool calls — capture what was done
@@ -130,17 +158,9 @@ function extractFromTranscript(lines) {
         }
       }
 
-      // Tool results — detect errors
-      if (entry.type === 'tool_result') {
-        const text = typeof entry.content === 'string'
-          ? entry.content
-          : Array.isArray(entry.content)
-            ? entry.content.filter(c => c.type === 'text').map(c => c.text).join(' ')
-            : '';
-        if (text && (text.includes('Error') || text.includes('error') || text.includes('FAILED') || text.includes('failed'))) {
-          errors.push(text.substring(0, 300));
-        }
-      }
+      // Tool results — detect errors (assistant-level tool_result blocks are rare; most live inside user messages)
+      // This branch handles standalone tool_result entries at JSONL root level
+      // No-op: tool_result errors are now captured in the user message block above
     } catch {
       // Skip malformed lines
     }
@@ -168,7 +188,7 @@ function truncateBuffer() {
 }
 
 function main() {
-  const timestamp = new Date().toISOString().replace('T', ' ', ).split('.')[0] + ' UTC';
+  const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
   let cwd = process.cwd();
   let transcriptPath = null;
 
@@ -239,7 +259,12 @@ function main() {
     fs.mkdirSync(path.dirname(BUFFER_PATH), { recursive: true });
     fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
   } catch (error) {
-    // Silent fail — hook must not block Claude
+    try {
+      fs.appendFileSync(
+        path.join(STRATAVARIOUS_HOME, 'memory', '.hook-errors.log'),
+        `${new Date().toISOString()} ${error.message}\n`
+      );
+    } catch {}
     process.exit(0);
   }
 }

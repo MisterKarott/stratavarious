@@ -38,12 +38,11 @@ echo "Last session consolidated: $LAST_CONSOLIDATION_DATE"
 if [ ! -f "$SESSION_BUFFER" ]; then
   echo "Session buffer: Not found (run setup first)"
 else
-  BUFFER_CONTENT=$(cat "${SESSION_BUFFER}")
-  if [[ "$BUFFER_CONTENT" == *"# Session Buffer"* && $(echo "$BUFFER_CONTENT" | wc -l) -le 2 ]]; then
-    echo "Session buffer: Empty (Ready for new captures)"
+  NUM=$(grep -cE '^## ' "$SESSION_BUFFER" 2>/dev/null || echo 0)
+  if [ "$NUM" -eq 0 ]; then
+    echo "Session buffer: Empty"
   else
-    NUM_BUFFERED_SESSIONS=$(grep -cE "## [0-9]{4}-[0-9]{2}-[0-9]{2}" "${SESSION_BUFFER}" | tr -d ' ')
-    echo "Session buffer: $NUM_BUFFERED_SESSIONS session(s) awaiting consolidation."
+    echo "Session buffer: $NUM session(s) awaiting consolidation."
   fi
 fi
 

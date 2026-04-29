@@ -3,6 +3,8 @@
 # Usage: ./validate.sh [vault-dir]
 # Exit 1 if any note is invalid
 
+set -euo pipefail
+
 STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
 VAULT_DIR="${1:-$STRATAVARIOUS_HOME/memory/vault}"
 
@@ -26,10 +28,10 @@ validate_file() {
     return
   fi
 
-  # Extract frontmatter fields
+  # Detect closing --- using awk for strictness
   local fm_end
-  fm_end=$(grep -n '^---' "$file" | head -2 | tail -1 | cut -d: -f1)
-  if [ -z "$fm_end" ] || [ "$fm_end" -le 1 ]; then
+  fm_end=$(awk '/^---$/{c++; if(c==2){print NR; exit}}' "$file")
+  if [ -z "$fm_end" ]; then
     echo "FAIL $basename — unclosed frontmatter"
     ERRORS=$((ERRORS + 1))
     return
@@ -38,11 +40,15 @@ validate_file() {
   local fm
   fm=$(head -$((fm_end - 1)) "$file" | tail -n +2)
 
-  # Required fields
+  # Required fields — use sed instead of grep -oP (not portable on macOS)
   local date categorie tags
-  date=$(echo "$fm" | grep -oP '^date:\s*\K.*' || true)
-  categorie=$(echo "$fm" | grep -oP '^categorie:\s*\K.*' || true)
-  tags=$(echo "$fm" | grep -oP '^tags:\s*\K.*' || true)
+  date=$(echo "$fm" | sed -n 's/^date:[[:space:]]*\(.*\)$/\1/p')
+  categorie=$(echo "$fm" | sed -n 's/^categorie:[[:space:]]*\(.*\)$/\1/p')
+  # Accept both 'categorie' and 'category' for backward compat
+  if [ -z "$categorie" ]; then
+    categorie=$(echo "$fm" | sed -n 's/^category:[[:space:]]*\(.*\)$/\1/p')
+  fi
+  tags=$(echo "$fm" | sed -n 's/^tags:[[:space:]]*\(.*\)$/\1/p')
 
   if [ -z "$date" ]; then
     echo "FAIL $basename — missing date"
@@ -53,7 +59,7 @@ validate_file() {
   fi
 
   if [ -z "$categorie" ]; then
-    echo "FAIL $basename — missing categorie"
+    echo "FAIL $basename — missing categorie/category"
     ERRORS=$((ERRORS + 1))
   elif ! echo " $VALID_CATEGORIES " | grep -q " $categorie "; then
     echo "FAIL $basename — invalid categorie: $categorie"

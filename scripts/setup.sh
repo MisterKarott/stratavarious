@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PLUGIN_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
@@ -37,7 +38,7 @@ if [ ! -f "$MEMORY_TARGET" ]; then
   cp "$TEMPLATE_DIR/MEMORY.md" "$MEMORY_TARGET"
   echo "Created MEMORY.md"
 elif grep -qF "$SV_MARKER" "$MEMORY_TARGET" 2>/dev/null; then
-  # Already has StrataVarious header — update in place
+  # Already has StrataVarious header — skip
   echo "MEMORY.md already contains StrataVarious index, skipping"
 else
   # Existing MEMORY.md without StrataVarious content — merge
@@ -59,7 +60,7 @@ fi
 
 # 4. Initialize Git in memory/
 if [ ! -d "$MEMORY_DIR/.git" ]; then
-  git init "$MEMORY_DIR"
+  git init -b main "$MEMORY_DIR"
   echo "Initialized git repository"
 else
   echo "Git repository already exists"
