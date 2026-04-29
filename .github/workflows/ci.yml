@@ -23,9 +23,13 @@ jobs:
         with:
           scandir: './scripts'
 
-      - name: Node version check
+      - name: Node syntax check
         run: |
-          node -v
-          # Verify hook runs without errors (dry test)
-          echo '{}' | node hooks/stratavarious-stop.js
+          node --check hooks/stratavarious-stop.js
+          echo "Hook syntax OK"
+
+      - name: Hook dry test
+        run: |
+          mkdir -p /tmp/strata-test/memory
+          STRATAVARIOUS_HOME=/tmp/strata-test echo '{}' | node hooks/stratavarious-stop.js
           echo "Hook executed without crash"
