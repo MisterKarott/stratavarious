@@ -28,7 +28,6 @@ StrataVarious/
 │       ├── *.md                ← Thematic notes (decisions, errors, skills, etc.)
 │       ├── journal/            ← Daily logs
 │       └── sessions/           ← Ejected sessions from STRATAVARIOUS.md
-└── evals/
 ```
 
 ### File roles
@@ -140,11 +139,11 @@ If STRATAVARIOUS.md exceeds 300 lines, compress older sessions first: shorten ac
 
 Before any write to the vault, run programmatic checks AND manual review.
 
-**Programmatic check (run via Bash):**
+**Programmatic check (run via Bash) — same regex as Phase 6:**
 
 ```bash
-# Check for secrets in the content about to be written
-echo "$CONTENT" | grep -En '(sk-[a-zA-Z0-9]{20,}|pk_[a-z]+_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|password\s*[=:]\s*\S+|api_key\s*[=:]\s*\S+|secret\s*[=:]\s*\S+|token\s*[=:]\s*\S+|bearer\s+[a-zA-Z0-9._-]+|(mongodb|postgres|mysql|redis)://[^:]+:[^@]+@)' || echo "CLEAN"
+# Check for secrets in the content about to be written (same scan as Phase 6)
+echo "$CONTENT" | grep -En '(sk-[a-zA-Z0-9]{20,}|pk_[a-z]+_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|password\s*[=:]\s*\S+|api_key\s*[=:]\s*\S+|secret\s*[=:]\s*\S+|(mongodb|postgres|mysql|redis)(\+[a-z]+)?://[^:]+:[^@]+@)' || echo "CLEAN"
 
 # Check for invisible Unicode characters
 echo "$CONTENT" | perl -ne 'print "INVISIBLE: line $.\n" if /[\x{200B}-\x{200F}\x{2028}-\x{202F}\x{FEFF}]/' || echo "UNICODE_CLEAN"
@@ -161,7 +160,7 @@ If any check detects issues: isolate the content, warn the user, do NOT write. T
 Distill the ejected session's valuable content into the vault. This is the most important phase — it's where raw session data becomes durable knowledge. This phase only runs after Phase 4 security scan has passed.
 
 1. **Check existing vault notes** — read `vault/*.md` and MEMORY.md first. Don't duplicate.
-2. **Thematic notes** — distribute durable facts into existing `vault/*.md` notes or create new ones. Use the `categorie` field to classify.
+2. **Thematic notes** — distribute durable facts into existing `vault/*.md` notes or create new ones. Use the `category` field to classify.
 3. **Profile** — if the session revealed new user preferences or habits, update `profile.md`. This file consolidates everything known about the user's working style: preferred tools, coding habits, communication patterns, recurring workflows. It's the one place where user knowledge accumulates across sessions.
 4. **Journal** — append a one-paragraph summary to `vault/journal/YYYY-MM-DD.md`
 5. **MEMORY.md** — update the index. Each entry: `- \`note-name.md\` — short description`. Group by theme.
@@ -171,16 +170,16 @@ When creating or updating vault notes, always use frontmatter:
 ```markdown
 ---
 date: YYYY-MM-DD
-categorie: [decision|convention|error|pattern|skill|preference|environment]
+category: [decision|convention|error|pattern|skill|preference|environment]
 tags: [#relevant, #tags]
-projet: [project name]
+project: [project name]
 source_session: [identifier]
 ---
 
 Content here. Start with a one-line summary of what this note captures.
 ```
 
-Why frontmatter matters: it enables filtering and classification. A note with `categorie: skill` is a reusable workflow. One with `categorie: error` documents a known pitfall. Tags enable cross-referencing.
+Why frontmatter matters: it enables filtering and classification. A note with `category: skill` is a reusable workflow. One with `category: error` documents a known pitfall. Tags enable cross-referencing.
 
 **Validation:** After Phase 5 completes, run the validation script:
 
@@ -214,7 +213,7 @@ If `gitleaks` is **not installed**, run the inline regex secret scan instead (St
 
 ```bash
 cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory"
-grep -rEn '(sk-[a-zA-Z0-9]{20,}|pk_[a-z]+_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|password\s*[=:]\s*\S+|api_key\s*[=:]\s*\S+|secret\s*[=:]\s*\S+|token\s*[=:]\s*\S+|bearer\s+[a-zA-Z0-9._-]+|(mongodb|postgres|mysql|redis)://[^:]+:[^@]+@)' vault/ --include='*.md' || echo "CLEAN"
+grep -rEn '(sk-[a-zA-Z0-9]{20,}|pk_[a-z]+_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|password\s*[=:]\s*\S+|api_key\s*[=:]\s*\S+|secret\s*[=:]\s*\S+|(mongodb|postgres|mysql|redis)(\+[a-z]+)?://[^:]+:[^@]+@)' vault/ --include='*.md' || echo "CLEAN"
 ```
 
 If output is anything other than `CLEAN`, warn the user and **abort the commit**.
@@ -245,7 +244,7 @@ Empty `session-buffer.md`. Keep only the header:
 ### What to retain
 
 - Explicit user preferences ("I prefer pnpm") or implicit ones (detected through usage)
-- User corrections ("non, fais plutôt comme ça")
+- User corrections ("no, do it this way instead")
 - Project conventions (naming, structure, tools)
 - Environment facts (OS, stack, config)
 - Significant completed work with date
@@ -268,7 +267,7 @@ Empty `session-buffer.md`. Keep only the header:
 When generating `tags:` for new or updated vault notes, prioritize:
 - **Relevance:** Tags must directly relate to the note's content, especially the `Objective`, `What worked`, and `Dead ends` from the source session.
 - **Genericity:** Prefer broad, reusable tags (e.g., `#cli`, `#config`, `#devtools`, `#backend`, `#frontend`, `#mobile`, `#cicd`, `#security`, `#testing`, `#javascript`, `#typescript`, `#python`, `#golang`, `#flutter`, `#react`, `#angular`, `#docker`, `#git`, `#pnpm`, `#npm`, `#yarn`, `#linux`, `#macos`, `#windows`) over highly specific, single-use terms.
-- **Categorization Synergy:** Leverage the `categorie:` field (e.g., `decision`, `convention`, `error`, `pattern`, `skill`, `preference`, `environment`) to inform tag choices. For example, a note with `categorie: error` might include `#debugging` or `#troubleshooting`.
+- **Categorization Synergy:** Leverage the `category:` field (e.g., `decision`, `convention`, `error`, `pattern`, `skill`, `preference`, `environment`) to inform tag choices. For example, a note with `category: error` might include `#debugging` or `#troubleshooting`.
 - **Consistency:** Use existing tags from the vault where applicable. Avoid creating new tags for concepts already represented.
 - **Quantity:** Aim for 3-7 tags per note to provide sufficient context without clutter.
 

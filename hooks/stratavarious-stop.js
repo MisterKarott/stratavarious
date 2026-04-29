@@ -20,23 +20,32 @@ const SECRET_PATTERNS = [
   /\b(ak_[a-zA-Z0-9]{20,})\b/g,
   /\b(rk_[a-zA-Z0-9]{20,})\b/g,
   // Generic key=value credentials
-  /\b(password|passwd|pwd|secret|token|api_key|apikey|access_key|private_key|auth_token|refresh_token|bearer)\s*[=:]\s*['"]?([^\s'"]{8,})['"]?/gi,
+  /\b(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)\s*[=:]\s*['"]?([^\s'"]{8,})['"]?/gi,
   // AWS-style keys
   /\b(AKIA[A-Z0-9]{16})\b/g,
-  // Generic hex/base64 tokens (standalone, 32+ chars)
-  /\b([a-f0-9]{40,})\b/gi,
-  // Connection strings with embedded passwords
-  /\b(mongodb|postgres|mysql|redis|amqp)(\+[a-z]+)?:\/\/[^:]+:([^@]+)@/gi,
-  // Bearer tokens in headers
-  /\b[Aa]uthorization\s*:\s*[Bb]earer\s+\S+/g,
-  // X-API-Key headers
-  /\bx-api-key\s*:\s*\S+/gi,
+  // Bearer tokens in headers — preserve label, redact only the token
+  /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g,
+  // X-API-Key headers — preserve label, redact only the key
+  /\b(x-api-key\s*:\s*)(\S+)/gi,
 ];
+
+// Connection strings — handled separately to preserve user/host context
+const CONN_STRING_PATTERN = /\b(mongodb|postgres|mysql|redis|amqp)(\+[a-z]+)?:\/\/([^:]+):([^@]+)@/gi;
 
 function scrubSecrets(text) {
   let cleaned = text;
+
+  // Connection strings: redact only the password portion
+  cleaned = cleaned.replace(CONN_STRING_PATTERN, (match, scheme, qualifier, user, pwd) => {
+    return match.replace(':' + pwd + '@', ':[REDACTED]@');
+  });
+
   for (const pattern of SECRET_PATTERNS) {
-    cleaned = cleaned.replace(pattern, (match) => {
+    cleaned = cleaned.replace(pattern, (match, ...args) => {
+      // Bearer / X-API-Key: args[0]=label, args[1]=secret
+      if (args.length >= 2 && typeof args[0] === 'string' && typeof args[1] === 'string') {
+        return args[0] + '[REDACTED]';
+      }
       if (match.length <= 8) return '[REDACTED]';
       return match.substring(0, 4) + '...' + '[REDACTED]';
     });
@@ -45,8 +54,16 @@ function scrubSecrets(text) {
 }
 
 // Strip invisible/suspicious Unicode characters
+// U+200B-U+200F (zero-width), U+2028-U+202F (line/word separators), U+FEFF (BOM), U+00AD (soft hyphen)
+// Build invisible Unicode regex dynamically to avoid source encoding issues
+const INVISIBLE_UNICODE_RE = new RegExp('['
+  + '\u200B-\u200F'  // zero-width chars
+  + '\u2028-\u202F'  // line/word separators
+  + '\uFEFF'           // BOM
+  + '\u00AD'           // soft hyphen
+  + ']', 'g');
 function stripInvisibleUnicode(text) {
-  return text.replace(/[​-‏ - ﻿­]/g, '');
+  return text.replace(INVISIBLE_UNICODE_RE, '');
 }
 
 function getProjectName(cwd) {
@@ -151,7 +168,7 @@ function truncateBuffer() {
 }
 
 function main() {
-  const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+  const timestamp = new Date().toISOString().replace('T', ' ', ).split('.')[0] + ' UTC';
   let cwd = process.cwd();
   let transcriptPath = null;
 

@@ -7,6 +7,21 @@ VAULT_DIR="$MEMORY_DIR/vault"
 echo "--- StrataVarious Vault Cleaning ---"
 echo ""
 
+# Detect hash command once
+if command -v md5sum >/dev/null 2>&1; then
+  HASH_CMD="md5sum"
+else
+  HASH_CMD="md5 -q"
+fi
+
+file_hash() {
+  if [ "$HASH_CMD" = "md5sum" ]; then
+    md5sum "$1" | cut -d' ' -f1
+  else
+    md5 -q "$1"
+  fi
+}
+
 # Collect all vault files (excluding journal for now)
 VAULT_FILES=()
 while IFS= read -r -d '' file; do
@@ -33,14 +48,14 @@ DUPLICATES_FOUND=0
 for i in "${!VAULT_FILES[@]}"; do
   FILE1="${VAULT_FILES[$i]}"
   SIZE1=$(stat -f%z "$FILE1" 2>/dev/null || stat -c%s "$FILE1" 2>/dev/null)
-  HASH1=$(md5sum "$FILE1" 2>/dev/null | cut -d' ' -f1 || md5 "$FILE1" | cut -d' ' -f4)
+  HASH1=$(file_hash "$FILE1")
 
   for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
     FILE2="${VAULT_FILES[$j]}"
     SIZE2=$(stat -f%z "$FILE2" 2>/dev/null || stat -c%s "$FILE2" 2>/dev/null)
 
     # Check if files are identical (same hash)
-    HASH2=$(md5sum "$FILE2" 2>/dev/null | cut -d' ' -f1 || md5 "$FILE2" | cut -d' ' -f4)
+    HASH2=$(file_hash "$FILE2")
 
     if [ "$HASH1" = "$HASH2" ]; then
       echo "⚠️  Exact duplicate detected:"
