@@ -26,7 +26,7 @@ echo "Vault size: $VAULT_SIZE"
 
 # 3. Last consolidation date
 if [ -f "$STRATAVARIOUS_MD" ]; then
-  LAST_CONSOLIDATION_DATE=$(grep -E "## Session — [0-9]{4}-[0-9]{2}-[0-9]{2}" "$STRATAVARIOUS_MD" | tail -n 1 | sed -E 's/.*([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/')
+  LAST_CONSOLIDATION_DATE=$(grep -E "^## [0-9]{4}-[0-9]{2}-[0-9]{2}" "$STRATAVARIOUS_MD" | tail -n 1 | sed -E 's/^## ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/')
   if [ -z "$LAST_CONSOLIDATION_DATE" ]; then
     LAST_CONSOLIDATION_DATE="N/A (No sessions found in STRATAVARIOUS.md)"
   fi

@@ -146,13 +146,18 @@ claude plugin install github.com/MisterKarott/stratavarious
 
 ```bash
 # 1. Install the plugin
+claude plugin install github.com/MisterKarott/stratavarious
+```
 
+```bash
 # 2. Initialize the vault — or skip this, /stratavarious auto-inits on first run
 bash ~/.claude/plugins/cache/*/stratavarious/*/scripts/setup.sh
+```
 
-# 3. Work normally — the Stop hook captures session data automatically
+The Stop hook captures session data automatically. Work normally.
 
-# 4. At end of session (or whenever you want), consolidate
+```bash
+# 3. At end of session (or whenever you want), consolidate
 /stratavarious
 ```
 

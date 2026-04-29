@@ -18,32 +18,27 @@ const MAX_BUFFER_SIZE = (Number.isFinite(_parsed) && _parsed > 0) ? _parsed : (5
 // This is acceptable (false positives preferred over false negatives).
 const LABELED_PATTERNS = [
   { re: /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g },
-  { re: /(x-api-key|Authorization\\s\*:\\s\*):\s\*)(\S\+)/gi },
+  { re: /\b([Aa]uthorization\s*:\s*[Bb]asic\s+)(\S+)/g },
+  { re: /\b(x-api-key\s*:\s*)(\S+)/gi },
   { re: /\b(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*[=:]\s*)['"]?([^\s'"]{8,})['"]?/gi },
 ];
 const SIMPLE_PATTERNS = [
-  // Stripe
-  /\b(sk-[a-zA-Z0-9]{17,})\b/g,
-  /\b(sk_live_[a-zA-Z0-9]{17,})\b/g,
-  /\b(sk_test_[a-zA-Z0-9]{17,})\b/g,
+  // Stripe (les vraies clés Stripe ont un underscore)
+  /\b(sk_live_[a-zA-Z0-9]{20,})\b/g,
+  /\b(sk_test_[a-zA-Z0-9]{20,})\b/g,
+  /\b(rk_(live|test)_[a-zA-Z0-9]{20,})\b/g,
   // OpenAI / Anthropic
-  /\b(sk-[a-zA-Z0-9]{20,})\b/g,  // duplicate kept for coverage
+  /\b(sk-[a-zA-Z0-9]{20,})\b/g,
   /\b(sk-ant-[a-zA-Z0-9]{20,})\b/g,
   // AWS
   /\b(AKIA[A-Z0-9]{16})\b/g,
   /\b(ASIA[A-Z0-9]{16})\b/g,
-  // Other keys
-  /\b(pk_[a-z]+_[a-zA-Z0-9]{20,})\b/g,
-  /\b(ak_[a-zA-Z0-9]{20,})\b/g,
-  /\b(rk_[a-zA-Z0-9]{20,})\b/g,
-  // GitHub tokens
-  /\bghp_[A-Za-z0-9]{36,}\b/g,
-  /\bgh[souru]_[A-Za-z0-9]{36,}\b/g,
-  /\bgho_[A-Za-z0-9]{36,}\b/g,
+  // GitHub
+  /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g,
   // Slack
   /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g,
   // Google API
-  /\bAIza[0-9A-Za-z_-]{35,}\b/g,
+  /\bAIza[0-9A-Za-z_-]{35}\b/g,
   // JWT
   /\beyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_.+/=-]+\b/g,
 ];
@@ -51,12 +46,20 @@ const SIMPLE_PATTERNS = [
 // Connection strings — handled separately to preserve user/host context
 const CONN_STRING_PATTERN = /\b(mongodb|postgres|mysql|redis|amqp)(\+[a-z]+)?:\/\/([^:]+):([^@]+)@/gi;
 
+// HTTP basic auth dans une URL
+const HTTP_BASIC_PATTERN = /\b(https?:\/\/)([^:\/\s]+):([^@\s]+)@/gi;
+
 function scrubSecrets(text) {
   let cleaned = text;
 
   // Connection strings: redact only the password portion
   cleaned = cleaned.replace(CONN_STRING_PATTERN, (match, scheme, qualifier, user, pwd) => {
     return match.replace(':' + pwd + '@', ':[REDACTED]@');
+  });
+
+  // HTTP basic auth in URLs
+  cleaned = cleaned.replace(HTTP_BASIC_PATTERN, (match, scheme, user, pwd) => {
+    return scheme + user + ':[REDACTED]@';
   });
 
   // Labeled patterns: keep the label prefix, redact the secret
@@ -119,6 +122,7 @@ function getModifiedFiles(dir) {
 }
 
 // Read the last N lines of a file (bounded to 256 KiB to avoid reading huge transcripts)
+function readLastNLines(filePath, n) {
   try {
     const stat = fs.statSync(filePath);
     const readSize = Math.min(stat.size, 256 * 1024);
@@ -297,4 +301,9 @@ function main() {
   }
 }
 
-main();
+// Export pour les tests (sans déclencher main si le module est require())
+if (require.main === module) {
+  main();
+}
+
+module.exports = { scrubSecrets, stripInvisibleUnicode, extractFromTranscript };
