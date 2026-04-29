@@ -16,7 +16,8 @@ ERRORS=0
 
 validate_file() {
   local file="$1"
-  local basename=$(basename "$file")
+  local basename
+  basename=$(basename "$file")
 
   # Check frontmatter exists
   if ! head -1 "$file" | grep -q '^---'; then

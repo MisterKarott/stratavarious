@@ -42,7 +42,7 @@ else
   if [[ "$BUFFER_CONTENT" == *"# Session Buffer"* && $(echo "$BUFFER_CONTENT" | wc -l) -le 2 ]]; then
     echo "Session buffer: Empty (Ready for new captures)"
   else
-    NUM_BUFFERED_SESSIONS=$(grep -E "## [0-9]{4}-[0-9]{2}-[0-9]{2}" "${SESSION_BUFFER}" | wc -l | tr -d ' ')
+    NUM_BUFFERED_SESSIONS=$(grep -cE "## [0-9]{4}-[0-9]{2}-[0-9]{2}" "${SESSION_BUFFER}" | tr -d ' ')
     echo "Session buffer: $NUM_BUFFERED_SESSIONS session(s) awaiting consolidation."
   fi
 fi

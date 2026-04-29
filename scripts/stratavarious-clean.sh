@@ -47,12 +47,10 @@ echo ""
 DUPLICATES_FOUND=0
 for i in "${!VAULT_FILES[@]}"; do
   FILE1="${VAULT_FILES[$i]}"
-  SIZE1=$(stat -f%z "$FILE1" 2>/dev/null || stat -c%s "$FILE1" 2>/dev/null)
   HASH1=$(file_hash "$FILE1")
 
   for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
     FILE2="${VAULT_FILES[$j]}"
-    SIZE2=$(stat -f%z "$FILE2" 2>/dev/null || stat -c%s "$FILE2" 2>/dev/null)
 
     # Check if files are identical (same hash)
     HASH2=$(file_hash "$FILE2")

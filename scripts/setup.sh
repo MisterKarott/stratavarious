@@ -42,10 +42,12 @@ elif grep -qF "$SV_MARKER" "$MEMORY_TARGET" 2>/dev/null; then
 else
   # Existing MEMORY.md without StrataVarious content — merge
   cp "$MEMORY_TARGET" "$MEMORY_BACKUP"
-  echo "" >> "$MEMORY_TARGET"
-  echo "---" >> "$MEMORY_TARGET"
-  echo "" >> "$MEMORY_TARGET"
-  cat "$TEMPLATE_DIR/MEMORY.md" >> "$MEMORY_TARGET"
+  {
+    echo ""
+    echo "---"
+    echo ""
+    cat "$TEMPLATE_DIR/MEMORY.md"
+  } >> "$MEMORY_TARGET"
   echo "MEMORY.md merged (backup: MEMORY.md.pre-stratavarious.bak)"
 fi
 
