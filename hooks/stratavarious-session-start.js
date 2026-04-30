@@ -104,7 +104,6 @@ function main() {
     let additionalContext = `[StrataVarious] Previous session handoff loaded from STRATA.md:\n\n${body}`;
     if (profile) additionalContext += '\n\n[StrataVarious] User profile loaded:\n\n' + profile;
     process.stdout.write(JSON.stringify({ additionalContext }));
-    process.stdout.write(JSON.stringify(result));
   } catch {
     process.stdout.write('{}');
   }

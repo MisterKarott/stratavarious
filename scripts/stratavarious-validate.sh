@@ -118,18 +118,30 @@ validate_file() {
 }
 
 # Process all .md files (excluding journal/ and sessions/)
+# Use a temp file to count errors across the pipe subshell boundary (Bash 3.2 compatible)
+ERROR_COUNT_FILE=$(mktemp)
+echo "0" > "$ERROR_COUNT_FILE"
+
 find "$VAULT_DIR" -type f -name "*.md" -print0 2>/dev/null | while IFS= read -r -d '' file; do
   case "$file" in
     */journal/*) continue ;;
     */sessions/*) continue ;;
   esac
+  ERRORS=0
   validate_file "$file"
+  if [ $ERRORS -gt 0 ]; then
+    prev=$(cat "$ERROR_COUNT_FILE")
+    echo $((prev + ERRORS)) > "$ERROR_COUNT_FILE"
+  fi
 done
 
-if [ $ERRORS -eq 0 ]; then
+TOTAL_ERRORS=$(cat "$ERROR_COUNT_FILE")
+rm -f "$ERROR_COUNT_FILE"
+
+if [ "$TOTAL_ERRORS" -eq 0 ]; then
   echo "All vault notes valid."
   exit 0
 else
-  echo "$ERRORS validation error(s) found."
+  echo "$TOTAL_ERRORS validation error(s) found."
   exit 1
 fi

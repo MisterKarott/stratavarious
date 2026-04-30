@@ -17,8 +17,8 @@ Everything lives in the StrataVarious workspace directory:
 ```
 StrataVarious/
 ├── hooks/
-│   ├── hooks.json                     ← Hook manifest (Stop event)
-│   └── stratavarious-stop.js          ← Stop hook (auto-captures session data)
+│   ├── stratavarious-stop.js          ← Stop hook (auto-captures session data)
+│   └── stratavarious-session-start.js ← SessionStart hook (injects STRATA.md + profile)
 ├── memory/
 │   ├── STRATAVARIOUS.md               ← Working memory (last 3 sessions)
 │   ├── MEMORY.md               ← Vault index (auto-loaded, first 200 lines)
@@ -62,7 +62,7 @@ this skill are resolved against the vault path.
 
 ## /stratavarious — Session Consolidation & Handoff
 
-This command runs the full consolidation pipeline. It replaces `/handoff` — producing a handoff-quality summary AND archiving to the vault. Execute in 7 phases.
+This command runs the full consolidation pipeline. It replaces `/handoff` — producing a handoff-quality summary AND archiving to the vault. Execute in 8 phases.
 
 ### Phase 0 — Capture intentions
 
@@ -189,7 +189,7 @@ If STRATAVARIOUS.md exceeds 300 lines, compress older sessions first: shorten ac
 
 Before any write to the vault, run programmatic checks AND manual review.
 
-**Programmatic check (run via Bash) — same regex as Phase 6:**
+**Programmatic check (run via Bash):**
 
 ```bash
 # Check for secrets in the content about to be written (same scan as Phase 6)
@@ -210,7 +210,7 @@ If any check detects issues: isolate the content, warn the user, do NOT write. T
 Distill the ejected session's valuable content into the vault. This is the most important phase — it's where raw session data becomes durable knowledge. This phase only runs after Phase 4 security scan has passed.
 
 1. **Check existing vault notes** — read `vault/*.md` and MEMORY.md first. Don't duplicate.
-2. **Thematic notes** — distribute durable facts into existing `vault/*.md` notes or create new ones. Use the `category` field to classify.
+2. **Thematic notes** — distribute durable facts into existing `vault/*.md` notes or create new ones. Use the `categorie` field to classify.
 3. **Profile** — if the session revealed new user preferences or habits, update `profile.md`. This file consolidates everything known about the user's working style: preferred tools, coding habits, communication patterns, recurring workflows. It's the one place where user knowledge accumulates across sessions.
 4. **Journal** — append a one-paragraph summary to `vault/journal/YYYY-MM-DD.md`
 5. **MEMORY.md** — update the index. Each entry: `- \`note-name.md\` — short description`. Group by theme.
@@ -220,16 +220,16 @@ When creating or updating vault notes, always use frontmatter:
 ```markdown
 ---
 date: YYYY-MM-DD
-category: [decision|convention|error|pattern|skill|preference|environment]
+categorie: [decision|convention|error|pattern|skill|preference|environment]
 tags: [#relevant, #tags]
-project: [project name]
+projet: [project name]
 source_session: [identifier]
 ---
 
 Content here. Start with a one-line summary of what this note captures.
 ```
 
-Why frontmatter matters: it enables filtering and classification. A note with `category: skill` is a reusable workflow. One with `category: error` documents a known pitfall. Tags enable cross-referencing.
+Why frontmatter matters: it enables filtering and classification. A note with `categorie: skill` is a reusable workflow. One with `categorie: error` documents a known pitfall. Tags enable cross-referencing.
 
 **Validation:** After Phase 5 completes, run the validation script:
 
@@ -277,7 +277,7 @@ Empty `session-buffer.md`. Keep only the header:
 When generating `tags:` for new or updated vault notes, prioritize:
 - **Relevance:** Tags must directly relate to the note's content, especially the `Objective`, `What worked`, and `Dead ends` from the source session.
 - **Genericity:** Prefer broad, reusable tags (e.g., `#cli`, `#config`, `#devtools`, `#backend`, `#frontend`, `#mobile`, `#cicd`, `#security`, `#testing`, `#javascript`, `#typescript`, `#python`, `#golang`, `#flutter`, `#react`, `#angular`, `#docker`, `#git`, `#pnpm`, `#npm`, `#yarn`, `#linux`, `#macos`, `#windows`) over highly specific, single-use terms.
-- **Categorization Synergy:** Leverage the `category:` field (e.g., `decision`, `convention`, `error`, `pattern`, `skill`, `preference`, `environment`) to inform tag choices. For example, a note with `category: error` might include `#debugging` or `#troubleshooting`.
+- **Categorization Synergy:** Leverage the `categorie:` field (e.g., `decision`, `convention`, `error`, `pattern`, `skill`, `preference`, `environment`) to inform tag choices. For example, a note with `categorie: error` might include `#debugging` or `#troubleshooting`.
 - **Consistency:** Use existing tags from the vault where applicable. Avoid creating new tags for concepts already represented.
 - **Quantity:** Aim for 3-7 tags per note to provide sufficient context without clutter.
 

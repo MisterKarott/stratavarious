@@ -6,6 +6,6 @@ argument-hint: ""
 allowed-tools: ["Bash", "Read", "Write", "Edit", "AskUserQuestion"]
 ---
 
-Exécute le skill **stratavarious** dans son intégralité (8 phases : capture intentions → read → analyze → write → security scan → archive vault → git commit → cleanup).
+Exécute le skill **stratavarious** dans son intégralité (8 phases : capture intentions → read → analyze → write STRATA.md → write STRATAVARIOUS.md → security scan → archive vault → cleanup).
 
 Ce skill est un alias de `/stratavarious`. Toute la logique, les règles et les phases sont définies dans `skills/stratavarious/SKILL.md`.
