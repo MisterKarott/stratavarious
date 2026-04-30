@@ -160,7 +160,7 @@ Next time you start Claude Code, your context is already there. Working memory l
 ```
 <your-project>/
 ├── STRATA.md                   ← Portable handoff (written by /strata, injected at next SessionStart)
-└── .strataignore               ← (optional) Skip capture for this project
+└── .strataignore               ← (optional) Skip capture — must contain a line with `disable` or `ignore`
 
 ~/.claude/workspace/stratavarious/
 └── memory/
@@ -242,6 +242,14 @@ StrataVarious includes a built-in secret scanner that runs before any data enter
 - Custom or proprietary key formats
 - Secrets embedded in non-standard locations
 - Base64-encoded credentials that don't match known patterns
+
+**Hardening built in:**
+- Invisible Unicode (zero-width spaces, BOM, TAG chars) is stripped **before** secret scrubbing, so attackers can't bypass the redactor by injecting ZWSP into a key.
+- The Stop hook never invokes a shell to write the buffer (`execFile`, not `exec`), removing a command-injection vector via `STRATAVARIOUS_HOME`.
+- The buffer file is opened with `O_NOFOLLOW` to defeat symlink-redirection attacks.
+- `transcript_path` from the harness is validated: must be absolute, end in `.jsonl`, and live under `~/.claude/projects/`.
+- `STRATA.md` is auto-loaded at SessionStart but flagged as **untrusted content** in the additional context — Claude treats it as data, not as instructions, so a malicious repo cannot inject commands via a planted handoff file.
+- Error logs mask `$HOME` to avoid leaking usernames or absolute paths.
 
 **Recommendations:**
 - Avoid pasting raw secrets into Claude Code sessions
