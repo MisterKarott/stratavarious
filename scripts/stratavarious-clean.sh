@@ -45,38 +45,40 @@ for f in "${VAULT_FILES[@]}"; do
   TITLES+=("$( { grep -m1 '^# ' "$f" 2>/dev/null || true; } | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ')")
 done
 
-# Check for exact duplicates based on content hash
+# Check for exact duplicates based on content hash (O(n) with dictionary)
 DUPLICATES_FOUND=0
+declare -A SEEN_HASH  # Associative array: hash -> filename
 for i in "${!VAULT_FILES[@]}"; do
-  HASH1="${HASHES[$i]}"
-  for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
-    HASH2="${HASHES[$j]}"
-    if [ "$HASH1" = "$HASH2" ]; then
-      echo "⚠️  Exact duplicate detected:"
-      echo "   $(basename "${VAULT_FILES[$i]}")"
-      echo "   $(basename "${VAULT_FILES[$j]}")"
-      echo "   Action: Delete one of them"
-      echo ""
-      DUPLICATES_FOUND=1
-    fi
-  done
+  h="${HASHES[$i]}"
+  if [[ -n "${SEEN_HASH[$h]:-}" ]]; then
+    echo "⚠️  Exact duplicate detected:"
+    echo "   $(basename "${VAULT_FILES[$i]}")"
+    echo "   $(basename "${SEEN_HASH[$h]}")"
+    echo "   Action: Delete one of them"
+    echo ""
+    DUPLICATES_FOUND=1
+  else
+    SEEN_HASH["$h"]="${VAULT_FILES[$i]}"
+  fi
 done
 
-# Check for similar titles
+# Check for similar titles (O(n) with dictionary)
 echo "Checking for similar topics..."
+declare -A SEEN_TITLE  # Associative array: title -> filename
 for i in "${!VAULT_FILES[@]}"; do
-  TITLE1="${TITLES[$i]}"
-  for j in $(seq $((i + 1)) $((${#VAULT_FILES[@]} - 1))); do
-    TITLE2="${TITLES[$j]}"
-    if [ -n "$TITLE1" ] && [ -n "$TITLE2" ] && [ "$TITLE1" = "$TITLE2" ]; then
+  t="${TITLES[$i]}"
+  if [[ -n "$t" ]]; then
+    if [[ -n "${SEEN_TITLE[$t]:-}" ]]; then
       echo "⚠️  Similar title detected:"
-      echo "   $(basename "${VAULT_FILES[$i]}") - $TITLE1"
-      echo "   $(basename "${VAULT_FILES[$j]}") - $TITLE2"
+      echo "   $(basename "${VAULT_FILES[$i]}") - $t"
+      echo "   $(basename "${SEEN_TITLE[$t]}") - $t"
       echo "   Action: Review and merge if covering same topic"
       echo ""
       DUPLICATES_FOUND=1
+    else
+      SEEN_TITLE["$t"]="${VAULT_FILES[$i]}"
     fi
-  done
+  fi
 done
 
 if [ $DUPLICATES_FOUND -eq 0 ]; then

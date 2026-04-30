@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
-const { scrubSecrets } = require('../hooks/stratavarious-stop.js');
+const { scrubSecrets, stripInvisibleUnicode, extractFromTranscript } = require('../hooks/stratavarious-stop.js');
 
 describe('scrubSecrets', () => {
   test('mongodb password redacted', () => {
@@ -59,5 +59,124 @@ describe('scrubSecrets', () => {
 
   test('empty string', () => {
     assert.strictEqual(scrubSecrets(''), '');
+  });
+
+  // Negative test: "the secret to happiness is..." should NOT be redacted (benign phrase)
+  test('benign phrase with "secret" not redacted', () => {
+    const txt = 'The secret to happiness is living in the moment.';
+    assert.strictEqual(scrubSecrets(txt), txt);
+  });
+
+  // Test that secret patterns require proper context (line start or YAML)
+  test('secret pattern requires line start or YAML context', () => {
+    // This should NOT match because it's mid-sentence without = or :
+    const txt = 'I discovered a secret garden behind the house';
+    assert.strictEqual(scrubSecrets(txt), txt);
+  });
+});
+
+describe('stripInvisibleUnicode', () => {
+  test('removes zero-width spaces', () => {
+    const txt = 'Hello​World';
+    assert.strictEqual(stripInvisibleUnicode(txt), 'HelloWorld');
+  });
+
+  test('removes zero-width non-joiner', () => {
+    const txt = 'co‌operation';
+    assert.strictEqual(stripInvisibleUnicode(txt), 'cooperation');
+  });
+
+  test('removes soft hyphen', () => {
+    const txt = 'fac­tory';
+    assert.strictEqual(stripInvisibleUnicode(txt), 'factory');
+  });
+
+  test('removes BOM', () => {
+    const txt = '﻿Hello';
+    assert.strictEqual(stripInvisibleUnicode(txt), 'Hello');
+  });
+
+  test('removes TAG characters (U+E0000-U+E007F)', () => {
+    const txt = 'Normal󠀀Text';
+    assert.strictEqual(stripInvisibleUnicode(txt), 'NormalText');
+  });
+
+  test('preserves normal text', () => {
+    const txt = 'Normal text with émojis 🎉 and spëcial çharacters';
+    assert.strictEqual(stripInvisibleUnicode(txt), txt);
+  });
+});
+
+describe('extractFromTranscript', () => {
+  test('extracts user messages from JSONL', () => {
+    const lines = [
+      '{"type":"user","message":{"content":"Hello, how are you?"}}',
+      '{"type":"assistant","message":{"content":[null]}}',
+    ];
+    const result = extractFromTranscript(lines);
+    assert.strictEqual(result.userMessages.length, 1);
+    assert.strictEqual(result.userMessages[0], 'Hello, how are you?');
+  });
+
+  test('extracts tool calls from JSONL', () => {
+    const lines = [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"write_file","input":{"file_path":"/path/to/file.txt"}}]}}',
+    ];
+    const result = extractFromTranscript(lines);
+    assert.strictEqual(result.toolCalls.length, 1);
+    assert.strictEqual(result.toolCalls[0].name, 'write_file');
+    assert.strictEqual(result.toolCalls[0].path, '/path/to/file.txt');
+  });
+
+  test('detects errors in tool results', () => {
+    const lines = [
+      '{"type":"user","message":{"content":[{"type":"tool_result","content":"Error: Command failed","is_error":true}]}}',
+    ];
+    const result = extractFromTranscript(lines);
+    assert.strictEqual(result.errors.length, 1);
+    assert.strictEqual(result.errors[0], 'Error: Command failed');
+  });
+
+  test('limits results to last N entries', () => {
+    // Create more than the limits
+    const lines = [];
+    for (let i = 0; i < 10; i++) {
+      lines.push(`{"type":"user","message":{"content":"Message ${i}"}}`);
+    }
+    const result = extractFromTranscript(lines);
+    assert.strictEqual(result.userMessages.length, 3); // Limited to last 3
+    assert.strictEqual(result.userMessages[2], 'Message 9');
+  });
+
+  test('handles malformed JSON lines gracefully', () => {
+    const lines = [
+      '{"type":"user","message":{"content":"Valid message"}}',
+      'invalid json line',
+      '{"type":"assistant","message":{"content":[null]}}',
+    ];
+    const result = extractFromTranscript(lines);
+    assert.strictEqual(result.userMessages.length, 1);
+  });
+});
+
+// Simple benchmark for performance regression detection
+describe('performance: scrubSecrets', () => {
+  test('scrubs 100KB of text in under 10ms', () => {
+    // Generate 100KB of text with various patterns
+    const chunks = [];
+    for (let i = 0; i < 1000; i++) {
+      chunks.push('Normal text with some patterns: ');
+      chunks.push('password=secret123 ');
+      chunks.push('Authorization: Bearer token ');
+      chunks.push('https://user:pass@host.com ');
+      chunks.push('Just a sentence describing the secret to success. ');
+    }
+    const largeText = chunks.join('\n');
+
+    const start = Date.now();
+    scrubSecrets(largeText);
+    const elapsed = Date.now() - start;
+
+    assert.ok(elapsed < 10, `scrubSecrets took ${elapsed}ms, expected < 10ms`);
   });
 });

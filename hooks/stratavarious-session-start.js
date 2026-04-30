@@ -6,13 +6,22 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const MAX_LINES = 200;
+const MAX_FILE_SIZE = 64 * 1024; // 64 KB max read to avoid loading huge STRATA.md files
 
 function getProjectRoot(cwd) {
+  // First, check if STRATA.md exists in current directory
+  const localStrata = path.join(cwd, 'STRATA.md');
+  if (fs.existsSync(localStrata)) {
+    return cwd;
+  }
+
+  // Otherwise, use git to find the repo root (but only if needed)
   try {
     const root = execSync('git rev-parse --show-toplevel', {
       cwd,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 2000, // Add timeout to avoid hanging
     }).trim();
     return root;
   } catch {
@@ -23,7 +32,8 @@ function getProjectRoot(cwd) {
 function main() {
   let input = {};
   try {
-    const raw = fs.readFileSync('/dev/stdin', 'utf8');
+    // Use fs.readFileSync(0, 'utf8') for cross-platform stdin reading (0 = stdin fd)
+    const raw = fs.readFileSync(0, 'utf8');
     if (raw.trim()) input = JSON.parse(raw);
   } catch {
     process.stdout.write('{}');
@@ -40,6 +50,32 @@ function main() {
   }
 
   try {
+    // Check file size before reading to avoid loading huge STRATA.md files
+    const stat = fs.statSync(strataPath);
+    if (stat.size > MAX_FILE_SIZE) {
+      // File too large, read only the first 64 KB
+      const buffer = Buffer.alloc(MAX_FILE_SIZE);
+      const fd = fs.openSync(strataPath, 'r');
+      try {
+        fs.readSync(fd, buffer, 0, MAX_FILE_SIZE, 0);
+      } finally {
+        fs.closeSync(fd);
+      }
+      const content = buffer.toString('utf8');
+      const lines = content.split('\n');
+      const truncated = lines.length > MAX_LINES;
+      const body = truncated
+        ? lines.slice(0, MAX_LINES).join('\n') + '\n\n[... truncated after 200 lines ...]'
+        : content;
+
+      const result = {
+        additionalContext: `[StrataVarious] Previous session handoff loaded from STRATA.md:\n\n${body}`,
+      };
+      process.stdout.write(JSON.stringify(result));
+      return;
+    }
+
+    // File is within size bounds, read normally
     const content = fs.readFileSync(strataPath, 'utf8');
     const lines = content.split('\n');
     const truncated = lines.length > MAX_LINES;

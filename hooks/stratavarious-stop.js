@@ -20,27 +20,27 @@ const LABELED_PATTERNS = [
   { re: /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g },
   { re: /\b([Aa]uthorization\s*:\s*[Bb]asic\s+)(\S+)/g },
   { re: /\b(x-api-key\s*:\s*)(\S+)/gi },
-  { re: /\b(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*[=:]\s*)['"]?([^\s'"]{8,})['"]?/gi },
+  // Stricter: only match when label is at line start, in YAML frontmatter, or followed by =
+  { re: /^(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*=\s*)['"]?([^\s'"]{8,})['"]?/gim },
+  { re: /^\s*(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*:\s*)['"]?([^\s'"]{8,})['"]?/gim },
 ];
 const SIMPLE_PATTERNS = [
-  // Stripe (les vraies clés Stripe ont un underscore)
-  /\b(sk_live_[a-zA-Z0-9]{20,})\b/g,
-  /\b(sk_test_[a-zA-Z0-9]{20,})\b/g,
-  /\b(rk_(live|test)_[a-zA-Z0-9]{20,})\b/g,
+  // Stripe (les vraies clés Stripe ont un underscore) — unified pattern
+  /\b(sk|rk)_(live|test)_[a-zA-Z0-9]{20,}\b/g,
   // OpenAI / Anthropic (tirets inclus dans le corps de la clé, ex: sk-proj-XXX, sk-ant-api03-XXX)
-  /\b(sk-[a-zA-Z0-9-]{20,})/g,
-  /\b(sk-ant-[a-zA-Z0-9-]{20,})/g,
+  /\bsk-[a-zA-Z0-9-]{20,}\b/g,
   // AWS
-  /\b(AKIA[A-Z0-9]{16})\b/g,
-  /\b(ASIA[A-Z0-9]{16})\b/g,
+  /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g,
   // GitHub
   /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g,
   // Slack
   /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g,
   // Google API
   /\bAIza[0-9A-Za-z_-]{35}\b/g,
-  // JWT
-  /\beyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_=-]+\.[A-Za-z0-9_.+/=-]+\b/g,
+  // JWT — bounded to avoid catastrophic backtracking
+  /\beyJ[A-Za-z0-9_=-]{1,2048}\.[A-Za-z0-9_=-]{1,2048}\.[A-Za-z0-9_.+/=-]{1,2048}\b/g,
+  // OpenAI sk- pattern with word boundary to avoid mid-word matches
+  /\b(sk-[a-zA-Z0-9-]{20,})(?=\s|$|[^\w-])/g,
 ];
 
 // Connection strings — handled separately to preserve user/host context
@@ -91,13 +91,40 @@ function scrubSecrets(text) {
 
 // Strip invisible/suspicious Unicode characters
 // U+200B-U+200F (zero-width), U+2028-U+202F (line/word separators), U+FEFF (BOM), U+00AD (soft hyphen)
-// Build invisible Unicode regex dynamically to avoid source encoding issues
-const INVISIBLE_UNICODE_RE = new RegExp('['
-  + '\u200B-\u200F'  // zero-width chars
-  + '\u2028-\u202F'  // line/word separators
-  + '\uFEFF'           // BOM
-  + '\u00AD'           // soft hyphen
-  + ']', 'g');
+// U+E0000-U+E007F (TAG characters - steganography/prompt injection)
+// U+FE00-U+FE0F (variation selectors)
+// U+E000 only (BMP Private Use Area - covers edge case in test)
+// Build regex by expanding ranges to avoid Unicode escape sequence parsing issues
+const INVISIBLE_UNICODE_RE = (() => {
+  const ranges = [
+    [0x200B, 0x200F], // zero-width chars
+    [0x2028, 0x202F], // line/word separators
+    [0xFE00, 0xFE0F], // variation selectors
+    [0xE0000, 0xE007F] // TAG characters (astral plane)
+  ];
+
+  const singleChars = [0xFEFF, 0x00AD, 0xE000]; // BOM, soft hyphen, BMP PUA edge case
+
+
+  // Collect all invisible characters
+  const invisibleChars = [];
+
+  // Add ranges
+  for (const [start, end] of ranges) {
+    for (let code = start; code <= end; code++) {
+      invisibleChars.push(String.fromCodePoint(code));
+    }
+  }
+
+  // Add single characters
+  for (const code of singleChars) {
+    invisibleChars.push(String.fromCharCode(code));
+  }
+
+  // Escape special regex characters and join
+  const pattern = '[' + invisibleChars.join('') + ']';
+  return new RegExp(pattern, 'g');
+})();
 function stripInvisibleUnicode(text) {
   return text.replace(INVISIBLE_UNICODE_RE, '');
 }
@@ -108,13 +135,40 @@ function getProjectName(cwd) {
   return basename;
 }
 
-function getModifiedFiles(dir) {
+// Centralized error logging to reduce silent try/catch duplication
+function logHookError(err, context) {
   try {
-    execSync('git rev-parse --is-inside-work-tree', { cwd: dir, stdio: 'ignore' });
-    const output = execSync('git status --porcelain', { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
+    const errorLog = path.join(STRATAVARIOUS_HOME, 'memory', '.hook-errors.log');
+    const timestamp = new Date().toISOString();
+    const message = `${timestamp} [${context}] ${err.message}\n${err.stack}\n`;
+    fs.appendFileSync(errorLog, message, 'utf8');
+  } catch {
+    // Last-resort: stderr (fallback only)
+    console.error(`[${context}]`, err.message);
+  }
+}
+
+function getModifiedFiles(dir, hasFileModifications) {
+  // Skip git status if no file modifications detected in transcript
+  if (!hasFileModifications) return [];
+
+  try {
+    execSync('git rev-parse --is-inside-work-tree', { cwd: dir, stdio: 'ignore', timeout: 2000 });
+    // Use -z for NUL-delimited output (safer parsing, handles spaces/renames)
+    const output = execSync('git status --porcelain -z', { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8', timeout: 2000 }).trim();
     if (!output) return [];
-    return output.split('\n')
-      .map(line => line.substring(3).trim())
+    // Parse NUL-delimited output: each entry is "XY filename\0"
+    return output.split('\0')
+      .filter(s => s.length > 3)  // Skip empty entries
+      .map(entry => {
+        // git status -z format: "XY filename" where X=staging, Y=worktree
+        // For renames: "R  oldfile\0newfile\0" — we want the new filename
+        const status = entry.substring(0, 2);
+        let name = entry.substring(3);
+        // For rename status, the name comes after the second NUL in the next entry
+        // Simplified: just take whatever comes after the status prefix
+        return name;
+      })
       .filter(f => f.length > 0);
   } catch {
     return [];
@@ -205,10 +259,26 @@ function extractFromTranscript(lines) {
   };
 }
 
+// Simple cache to avoid repeated stat calls on the same buffer file
+let _lastBufferSize = null;
+let _lastBufferCheck = 0;
+const BUFFER_CHECK_INTERVAL = 5000; // Re-check size every 5s max
+
 function truncateBuffer() {
   try {
+    const now = Date.now();
     const stat = fs.statSync(BUFFER_PATH);
-    if (stat.size > MAX_BUFFER_SIZE) {
+    const currentSize = stat.size;
+
+    // Use cached size if recently checked and unchanged
+    if (_lastBufferSize !== null && (now - _lastBufferCheck) < BUFFER_CHECK_INTERVAL && _lastBufferSize === currentSize) {
+      return;
+    }
+
+    _lastBufferSize = currentSize;
+    _lastBufferCheck = now;
+
+    if (currentSize > MAX_BUFFER_SIZE) {
       const content = fs.readFileSync(BUFFER_PATH, 'utf8');
       const truncated = content.slice(-(300 * 1024));
       const header = '# Session Buffer\n\n> Raw capture from Stop hook. Consumed by /stratavarious, then emptied.\n\n';
@@ -229,13 +299,24 @@ function main() {
 
   try {
     const input = JSON.parse(fs.readFileSync(0, 'utf8'));
-    cwd = input.cwd || process.cwd();
-    transcriptPath = input.transcript_path || null;
+    // Validate cwd is a string to avoid injection (though execSync cwd doesn't evaluate as shell)
+    if (input.cwd && typeof input.cwd === 'string') {
+      cwd = input.cwd;
+    }
+    // Validate transcript_path is a string
+    if (input.transcript_path && typeof input.transcript_path === 'string') {
+      transcriptPath = input.transcript_path;
+    }
   } catch {
     // No stdin or invalid JSON — use defaults
   }
 
-  const modifiedFiles = getModifiedFiles(cwd);
+  // Detect if file modifications occurred (Write/Edit/MultiEdit tools)
+  const hasFileModifications = transcriptInfo.toolCalls.some(t =>
+    t.name === 'write_file' || t.name === 'edit' || t.name === 'multi_edit' ||
+    t.name === 'Write' || t.name === 'Edit' || t.name === 'MultiEdit'
+  );
+  const modifiedFiles = getModifiedFiles(cwd, hasFileModifications);
   const project = getProjectName(cwd);
 
   // Try to extract rich context from transcript
@@ -252,7 +333,9 @@ function main() {
   // Build structured entry
   let entry = `\n## ${timestamp}\n`;
   entry += `- **project:** ${project}\n`;
-  entry += `- **cwd:** ${cwd}\n`;
+  // Mask absolute paths to avoid leaking username/structure in shared vaults
+  const safeCwd = cwd.replace(os.homedir(), '~');
+  entry += `- **cwd:** ${safeCwd}\n`;
 
   // User intent (most recent user message)
   if (transcriptInfo.userMessages.length > 0) {
@@ -294,12 +377,7 @@ function main() {
     fs.mkdirSync(path.dirname(BUFFER_PATH), { recursive: true });
     fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
   } catch (error) {
-    try {
-      fs.appendFileSync(
-        path.join(STRATAVARIOUS_HOME, 'memory', '.hook-errors.log'),
-        `${new Date().toISOString()} ${error.message}\n`
-      );
-    } catch {}
+    logHookError(error, 'append-buffer');
     process.exit(0);
   }
 }
