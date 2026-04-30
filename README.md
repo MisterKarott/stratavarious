@@ -119,7 +119,7 @@ Together, these layers mean Claude starts every session knowing what you did rec
 ## Requirements
 
 - Claude Code (latest stable release)
-- Bash 4+ (`scripts/` are POSIX-compatible shell)
+- Bash 3.2+ (macOS default works — all scripts are Bash 3.2 compatible)
 - Git (handoff detection is scoped to the current git project)
 - macOS, Linux, or Windows via WSL
 
