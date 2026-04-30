@@ -1,0 +1,7 @@
+# StrataVarious ignore file
+# Place at the root of any project where you don't want session capture.
+# Any non-comment, non-empty line enables ignore mode for this project.
+# Example patterns (informational — any content here activates ignore):
+# temp/
+# experiments/
+# scratch/
