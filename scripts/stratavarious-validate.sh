@@ -2,6 +2,7 @@
 # validate.sh — Validate vault note frontmatter against the expected schema
 # Usage: ./validate.sh [vault-dir]
 # Exit 1 if any note is invalid
+# Compatible with Bash 3.2 (macOS default)
 
 set -euo pipefail
 
@@ -21,8 +22,6 @@ validate_file() {
   local basename
   basename=$(basename "$file")
 
-  # Single awk pass to validate and extract all frontmatter fields
-  # This reduces 6 forks per file to 1, improving from ~6000 to ~1000 total forks for 1000 notes
   local result
   result=$(awk '
   BEGIN { found_opening = 0; found_closing = 0; line_count = 0; fm_lines = "" }
@@ -37,7 +36,6 @@ validate_file() {
       exit
     }
     if (found_opening && !found_closing) {
-      # Accumulate frontmatter lines for parsing
       fm_lines = fm_lines $0 "\n"
     }
   }
@@ -54,7 +52,6 @@ validate_file() {
       print "TOO_SHORT"
       exit
     }
-    # Parse frontmatter fields
     date = ""
     categorie = ""
     tags = ""
@@ -75,7 +72,6 @@ validate_file() {
   }
   ' "$file")
 
-  # Parse the awk result
   case "$result" in
     MISSING_OPENING)
       echo "FAIL $basename — missing frontmatter opening ---"
@@ -94,7 +90,6 @@ validate_file() {
       ;;
   esac
 
-  # Extract fields from result
   local date categorie tags
   date=$(echo "$result" | cut -d'|' -f1)
   categorie=$(echo "$result" | cut -d'|' -f2)
@@ -123,11 +118,13 @@ validate_file() {
 }
 
 # Process all .md files (excluding journal/ and sessions/)
-while IFS= read -r -d '' file; do
-  [[ "$file" =~ /journal/ ]] && continue
-  [[ "$file" =~ /sessions/ ]] && continue
+find "$VAULT_DIR" -type f -name "*.md" -print0 2>/dev/null | while IFS= read -r -d '' file; do
+  case "$file" in
+    */journal/*) continue ;;
+    */sessions/*) continue ;;
+  esac
   validate_file "$file"
-done < <(find "$VAULT_DIR" -type f -name "*.md" -print0 2>/dev/null)
+done
 
 if [ $ERRORS -eq 0 ]; then
   echo "All vault notes valid."
