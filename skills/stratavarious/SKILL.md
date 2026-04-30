@@ -72,8 +72,6 @@ Before any consolidation, ask the user:
 
 Wait for the response. It can be a sentence, a list, or "nothing". This answer feeds directly into the `**Next steps:**` field of the session summary. If the user has nothing to add, write `none`.
 
-Wait for the response. It can be a sentence, a list, or "nothing". This answer feeds directly into the `**Next steps:**` field of the session summary. If the user has nothing to add, write `none`.
-
 ### Phase 1 — Read (dual source)
 
 **Primary source: the current conversation.** You have full context of what happened this session — use it directly. The conversation IS the richest data source.
@@ -236,10 +234,11 @@ Why frontmatter matters: it enables filtering and classification. A note with `c
 **Validation:** After Phase 5 completes, run the validation script:
 
 ```bash
-bash "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/../StrataVarious/scripts/stratavarious-validate.sh"
+PLUGIN_ROOT=$(node -e "try{require('fs').realpathSync('${CLAUDE_PLUGIN_ROOT}')}catch(e){}" 2>/dev/null)
+bash "${PLUGIN_ROOT}/scripts/stratavarious-validate.sh"
 ```
 
-If errors are found, fix the malformed notes before proceeding to Phase 6.
+If `CLAUDE_PLUGIN_ROOT` is unavailable or the script is not found, skip validation silently. If errors are found, fix the malformed notes before proceeding to Phase 6.
 
 ### Phase 6 — Git commit
 
@@ -277,7 +276,7 @@ Also warn: `"gitleaks not found — used inline regex scan instead. Install for 
 If both scans pass (or inline scan is clean), proceed:
 
 ```bash
-cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}" && git add -A && git commit -m "stratavarious: [identifier]"
+cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory" && git add -A && git commit -m "stratavarious: [identifier]"
 ```
 
 If git is not initialized, initialize it first (`git init`). If commit fails, skip silently. The files are already written.
@@ -339,9 +338,7 @@ The session executed a task already covered by an existing skill but with a diff
 
 ## Session loading
 
-At the start of each session, Claude reads STRATAVARIOUS.md, MEMORY.md, and profile.md
-via its auto-memory system. A SessionStart hook could inject these via
-additionalContext — this is planned for a future iteration.
+At the start of each session, the `SessionStart` hook automatically injects `STRATA.md` from the current project root into Claude's context via `additionalContext`. This gives the new session immediate access to the previous session's handoff without any manual action.
 
 ### Context fencing
 
