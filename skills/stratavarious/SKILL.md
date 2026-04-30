@@ -62,7 +62,7 @@ this skill are resolved against the vault path.
 
 ## /stratavarious — Session Consolidation & Handoff
 
-This command runs the full consolidation pipeline. It replaces `/handoff` — producing a handoff-quality summary AND archiving to the vault. Execute in 8 phases.
+This command runs the full consolidation pipeline. It replaces `/handoff` — producing a handoff-quality summary AND archiving to the vault. Execute in 7 phases.
 
 ### Phase 0 — Capture intentions
 
@@ -170,7 +170,7 @@ After writing, output: `STRATA.md written → [full path]`
 
 **Error handling:** If write fails, warn the user and continue to Phase 3. Never block on STRATA.md failure.
 
-> **Note:** STRATA.md is written to the current project root — not the StrataVarious vault. If the current project has its own git repo, STRATA.md will need to be committed there separately. The StrataVarious Phase 6 commit only covers the vault directory.
+> **Note:** STRATA.md is written to the current project root — not the StrataVarious vault.
 
 ### Phase 3 — Write to STRATAVARIOUS.md
 
@@ -240,48 +240,7 @@ bash "${PLUGIN_ROOT}/scripts/stratavarious-validate.sh"
 
 If `CLAUDE_PLUGIN_ROOT` is unavailable or the script is not found, skip validation silently. If errors are found, fix the malformed notes before proceeding to Phase 6.
 
-### Phase 6 — Git commit
-
-Before committing, run a secret detection scan. This is mandatory — no commits without verification.
-
-**Step 1: Check for gitleaks**
-
-```bash
-command -v gitleaks >/dev/null 2>&1 && echo "available" || echo "not_installed"
-```
-
-If `gitleaks` is **available**, run it on the vault:
-
-```bash
-cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory" && gitleaks detect --source . --no-git --exit-code 0
-```
-
-If secrets are detected, warn the user and **abort the commit**. This is a hard block — no exceptions.
-
-If `gitleaks` is **not installed**, run the inline regex secret scan instead (Step 2).
-
-**Step 2: Inline regex secret scan (fallback when gitleaks is absent)**
-
-```bash
-cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory"
-grep -rEn '(sk-[a-zA-Z0-9]{20,}|pk_[a-z]+_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|password\s*[=:]\s*\S+|api_key\s*[=:]\s*\S+|secret\s*[=:]\s*\S+|(mongodb|postgres|mysql|redis)(\+[a-z]+)?://[^:]+:[^@]+@)' vault/ --include='*.md' || echo "CLEAN"
-```
-
-If output is anything other than `CLEAN`, warn the user and **abort the commit**.
-
-Also warn: `"gitleaks not found — used inline regex scan instead. Install for full coverage: brew install gitleaks"`
-
-**Step 3: Commit**
-
-If both scans pass (or inline scan is clean), proceed:
-
-```bash
-cd "${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}/memory" && git add -A && git commit -m "stratavarious: [identifier]"
-```
-
-If git is not initialized, initialize it first (`git init`). If commit fails, skip silently. The files are already written.
-
-### Phase 7 — Cleanup
+### Phase 6 — Cleanup
 
 Empty `session-buffer.md`. Keep only the header:
 ```
@@ -360,7 +319,6 @@ If the user triggers `/compact` or you detect that the context window is getting
 | 3 (Write) | Write impossible | Stop. Tell user. Do not continue |
 | 5 (Archive) | Distillation error | Log it. Session stays in STRATAVARIOUS.md |
 | 4 (Security) | Suspicious content | Isolate. Warn user. Do not write |
-| 6 (Git) | Git absent/error | Skip silently |
-| 7 (Cleanup) | Purge failure | Previous phases remain valid |
+| 6 (Cleanup) | Purge failure | Previous phases remain valid |
 
 **General rule:** never delete data before the next phase succeeds. When in doubt, keep rather than lose.

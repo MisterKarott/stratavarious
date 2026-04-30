@@ -47,7 +47,7 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 
 **Selective memory, not hoarding.** StrataVarious doesn't dump entire conversation transcripts into files. The consolidation pipeline analyzes, filters, and structures raw session data into concise, actionable knowledge. A 2-hour debugging session might produce 5 lines of vault knowledge — the 5 lines that matter.
 
-**Local-first, always.** All data stays on your machine. No cloud sync, no external API calls, no telemetry. Your vault is a git repository you control entirely.
+**Local-first, always.** All data stays on your machine. No cloud sync, no external API calls, no telemetry. Your vault is entirely under your control.
 
 ## How It Works
 
@@ -93,10 +93,7 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 │  │  Phase 5 — Archive to vault              │            │
 │  │    Persist themed knowledge notes        │            │
 │  │                                          │            │
-│  │  Phase 6 — Git commit                    │            │
-│  │    Version the accumulated knowledge     │            │
-│  │                                          │            │
-│  │  Phase 7 — Cleanup buffer                │            │
+│  │  Phase 6 — Cleanup buffer                │            │
 │  │    Clear raw session data                │            │
 │  └────────────────┬─────────────────────────┘            │
 │                   ▼                                      │
@@ -146,15 +143,11 @@ A `SessionStart` hook detects `STRATA.md` at the current project root and automa
 
 ### Consolidation Pipeline
 
-Running `/stratavarious` triggers a 9-phase pipeline: capture intentions → read conversation + buffer → analyze → write STRATA.md → write to working memory → security scan → archive to vault → git commit → cleanup.
+Running `/stratavarious` triggers a 7-phase pipeline: capture intentions → read conversation + buffer → analyze → write STRATA.md → write to working memory → security scan → archive to vault → cleanup.
 
 ### Security Scan
 
 Before anything enters the vault, a security scan strips credentials, API keys, tokens, and other sensitive values. Your secrets stay out of the knowledge base. The raw session buffer is also gitignored as an additional safety net.
-
-### Git-Tracked History
-
-The entire vault is a git repository. Every consolidation creates a commit. You can diff knowledge over time, revert bad entries, branch for experiments, or audit what was captured. Your memory has a history.
 
 ## Installation
 
@@ -207,7 +200,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 
 | Command | Description |
 |---|---|
-| `/stratavarious` | Run the full 9-phase consolidation pipeline — captures intentions, analyzes the conversation, writes `STRATA.md` to project root, updates working memory, archives to vault, commits to git |
+| `/stratavarious` | Run the full 7-phase consolidation pipeline — captures intentions, analyzes the conversation, writes `STRATA.md` to project root, updates working memory, archives to vault |
 | `/strata` | Alias for `/stratavarious` — same pipeline, shorter name |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 
@@ -258,7 +251,7 @@ Override by setting the environment variable before starting Claude Code.
 
 **Long-running projects** — After weeks of work, the vault accumulates deep project knowledge. Claude becomes more effective over time, not less.
 
-**Team context sharing** — The vault is a git repo. Commit it to your project and teammates get the accumulated knowledge. New team members ramp up faster.
+**Team context sharing** — The vault can be shared directly with teammates. Add it to your project and everyone gets the accumulated knowledge. New team members ramp up faster.
 
 **Debugging journals** — The error resolution entries form a searchable history of every bug you've encountered and how it was fixed. Like a personal Stack Overflow.
 
