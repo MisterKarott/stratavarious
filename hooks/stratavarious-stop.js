@@ -289,6 +289,17 @@ function truncateBuffer() {
   }
 }
 
+function shouldIgnore(cwd) {
+  try {
+    const ignorePath = path.join(cwd, '.strataignore');
+    if (!fs.existsSync(ignorePath)) return false;
+    const content = fs.readFileSync(ignorePath, 'utf8').trim();
+    return content.split('\n').some(l => l.trim() && !l.startsWith('#'));
+  } catch {
+    return false;
+  }
+}
+
 function main() {
   // Allow disabling via env var
   if (process.env.STRATAVARIOUS_DISABLE === '1') process.exit(0);
@@ -310,6 +321,13 @@ function main() {
   } catch {
     // No stdin or invalid JSON — use defaults
   }
+
+  // Check for .strataignore in project root
+  if (shouldIgnore(cwd)) process.exit(0);
+
+  // Check for pause marker
+  const pauseMarker = path.join(STRATAVARIOUS_HOME, 'memory', '.stratavarious-paused');
+  if (fs.existsSync(pauseMarker)) process.exit(0);
 
   // Initialize transcriptInfo early to avoid TDZ
   let transcriptInfo = { userMessages: [], toolCalls: [], errors: [] };
@@ -374,11 +392,18 @@ function main() {
   // Guard buffer size
   truncateBuffer();
 
-  // Append
+  // Append via locked write wrapper
   try {
     fs.mkdirSync(path.dirname(BUFFER_PATH), { recursive: true });
-    fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'stratavarious-write.sh');
+    execSync(`bash "${scriptPath}" "${BUFFER_PATH}"`, { input: entry, encoding: 'utf8', timeout: 35000 });
   } catch (error) {
+    // Fallback to direct write if wrapper fails
+    try {
+      fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
+    } catch (fbError) {
+      logHookError(fbError, 'append-buffer-fallback');
+    }
     logHookError(error, 'append-buffer');
     process.exit(0);
   }

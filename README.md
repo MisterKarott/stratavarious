@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
-  <img src="https://img.shields.io/badge/version-1.6.0-6c5ce7?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
 </p>
 
@@ -119,7 +119,7 @@ Together, these layers mean Claude starts every session knowing what you did rec
 ## Requirements
 
 - Claude Code (latest stable release)
-- Bash 4+ (`scripts/` are POSIX-compatible shell)
+- Bash 3.2+ (macOS default works — all scripts are Bash 3.2 compatible)
 - Git (handoff detection is scoped to the current git project)
 - macOS, Linux, or Windows via WSL
 
@@ -159,18 +159,28 @@ Next time you start Claude Code, your context is already there. Working memory l
 
 ```
 <your-project>/
-└── STRATA.md                   ← Portable handoff (written by /strata, injected at next SessionStart)
+├── STRATA.md                   ← Portable handoff (written by /strata, injected at next SessionStart)
+└── .strataignore               ← (optional) Skip capture for this project
 
 ~/.claude/workspace/stratavarious/
 └── memory/
     ├── STRATAVARIOUS.md        ← Working memory (last 3 sessions, auto-loaded)
     ├── MEMORY.md               ← Vault index (auto-loaded by Claude at session start)
-    ├── profile.md              ← Detected user preferences and work patterns
+    ├── profile.md              ← Developer preferences and work patterns (global)
     ├── session-buffer.md       ← Raw capture from Stop hook (gitignored)
     └── vault/
-        ├── *.md                ← Themed knowledge notes (decisions, errors, patterns...)
-        ├── journal/            ← Daily summaries for chronological browsing
-        └── sessions/           ← Full archived session data
+        ├── _global/            ← Cross-project knowledge
+        │   ├── decisions/
+        │   ├── conventions/
+        │   ├── patterns/
+        │   ├── errors/
+        │   ├── skills/
+        │   └── environments/
+        ├── my-project/         ← Per-project knowledge
+        │   ├── decisions/
+        │   └── ...
+        └── another-project/
+            └── ...
 ```
 
 The vault is designed to be human-readable. Every file is plain Markdown. You can browse, edit, or delete entries manually. The system won't break if you rearrange things.
@@ -182,6 +192,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `/stratavarious` | Run the full 7-phase consolidation pipeline — captures intentions, analyzes the conversation, writes `STRATA.md` to project root, updates working memory, archives to vault |
 | `/strata` | Alias for `/stratavarious` |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
+| `/strata-pause` | Toggle session capture on/off — pause for exploratory sessions, resume when ready |
 
 ## Scripts
 
@@ -191,6 +202,8 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/stratavarious-status.sh` | CLI status check — useful outside Claude Code |
 | `scripts/stratavarious-clean.sh` | Scan the vault for duplicate or stale entries and flag them for review |
 | `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed (CI-friendly) |
+| `scripts/stratavarious-write.sh` | File-locked append wrapper — ensures safe concurrent vault writes |
+| `scripts/demo-recording.sh` | Record an Asciinema demo of the StrataVarious workflow |
 
 ## What gets captured
 
@@ -213,6 +226,29 @@ StrataVarious is selective by design. Not everything in a session is worth remem
 | Data residency | Everything stays on your machine. No cloud, no API, no sync |
 
 No data ever leaves your machine. There is no telemetry, no analytics, no phone-home. The vault is yours.
+
+## Security
+
+StrataVarious includes a built-in secret scanner that runs before any data enters the vault. It detects and redacts:
+
+- API keys (Stripe, OpenAI, Anthropic, AWS, GitHub, Slack, Google)
+- Bearer and Basic authentication headers
+- Database connection strings (MongoDB, PostgreSQL, MySQL, Redis)
+- Passwords in key-value assignments (`password=...`, `api_key: ...`)
+- JWT tokens
+- HTTP basic auth in URLs
+
+**Important limitations:** The scanner uses pattern matching (regex). It cannot guarantee detection of all possible secret formats, especially:
+- Custom or proprietary key formats
+- Secrets embedded in non-standard locations
+- Base64-encoded credentials that don't match known patterns
+
+**Recommendations:**
+- Avoid pasting raw secrets into Claude Code sessions
+- Use environment variables or secret managers instead of hardcoding values
+- Consider [gitleaks](https://github.com/gitleaks/gitleaks) or [trufflehog](https://github.com/trufflesecurity/trufflehog) as complementary tools for comprehensive secret detection
+
+StrataVarious reduces the risk of secrets entering the vault, but does not eliminate it.
 
 ## Configuration
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+# Compatible with Bash 3.2 (macOS default)
 set -euo pipefail
 
 STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
@@ -18,71 +19,105 @@ file_hash() {
   fi
 }
 
-# Collect all vault files (excluding journal)
-VAULT_FILES=()
-while IFS= read -r -d '' file; do
-  if [[ "$file" =~ /journal/ ]]; then
-    continue
-  fi
-  VAULT_FILES+=("$file")
-done < <(find "$VAULT_DIR" -type f -name "*.md" -print0)
+# Collect all vault files (excluding journal and sessions) into temp files
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
 
-if [ ${#VAULT_FILES[@]} -eq 0 ]; then
+find "$VAULT_DIR" -type f -name "*.md" -print0 2>/dev/null | while IFS= read -r -d '' file; do
+  case "$file" in
+    */journal/*) continue ;;
+    */sessions/*) continue ;;
+  esac
+  echo "$file"
+done > "$TMPDIR/files.txt"
+
+FILE_COUNT=$(wc -l < "$TMPDIR/files.txt" | tr -d ' ')
+
+if [ "$FILE_COUNT" -eq 0 ]; then
   echo "No vault files found."
   exit 0
 fi
 
-echo "Found ${#VAULT_FILES[@]} vault files to analyze:"
-for file in "${VAULT_FILES[@]}"; do
-  echo "  - $(basename "$file")"
-done
+echo "Found $FILE_COUNT vault files to analyze"
 echo ""
 
-# Pre-compute hashes and titles to avoid O(n²) re-computation
-declare -a HASHES TITLES
-for f in "${VAULT_FILES[@]}"; do
-  HASHES+=("$(file_hash "$f")")
-  TITLES+=("$( { grep -m1 '^# ' "$f" 2>/dev/null || true; } | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ')")
-done
-
-# Check for exact duplicates based on content hash (O(n) with dictionary)
+# Pre-compute hashes and titles
 DUPLICATES_FOUND=0
-declare -A SEEN_HASH  # Associative array: hash -> filename
-for i in "${!VAULT_FILES[@]}"; do
-  h="${HASHES[$i]}"
-  if [[ -n "${SEEN_HASH[$h]:-}" ]]; then
-    echo "⚠️  Exact duplicate detected:"
-    echo "   $(basename "${VAULT_FILES[$i]}")"
-    echo "   $(basename "${SEEN_HASH[$h]}")"
-    echo "   Action: Delete one of them"
-    echo ""
-    DUPLICATES_FOUND=1
-  else
-    SEEN_HASH["$h"]="${VAULT_FILES[$i]}"
-  fi
-done
 
-# Check for similar titles (O(n) with dictionary)
-echo "Checking for similar topics..."
-declare -A SEEN_TITLE  # Associative array: title -> filename
-for i in "${!VAULT_FILES[@]}"; do
-  t="${TITLES[$i]}"
-  if [[ -n "$t" ]]; then
-    if [[ -n "${SEEN_TITLE[$t]:-}" ]]; then
-      echo "⚠️  Similar title detected:"
-      echo "   $(basename "${VAULT_FILES[$i]}") - $t"
-      echo "   $(basename "${SEEN_TITLE[$t]}") - $t"
-      echo "   Action: Review and merge if covering same topic"
-      echo ""
+# Check for exact duplicates using sorted hashes
+while IFS= read -r file; do
+  h=$(file_hash "$file")
+  echo "$h  $file"
+done < "$TMPDIR/files.txt" | sort > "$TMPDIR/hashed.txt"
+
+awk '
+{
+  hash = $1
+  # Rebuild filename (may contain spaces)
+  fname = ""
+  for (i = 2; i <= NF; i++) {
+    if (fname != "") fname = fname " "
+    fname = fname $i
+  }
+  if (hash == prev_hash) {
+    print "DUP: " prev_file
+    print "DUP: " fname
+  }
+  prev_hash = hash
+  prev_file = fname
+}
+' "$TMPDIR/hashed.txt" | while IFS= read -r line; do
+  case "$line" in
+    DUP:\ *)
+      f=$(echo "$line" | sed 's/^DUP: //')
+      echo "  - $(basename "$f")"
       DUPLICATES_FOUND=1
-    else
-      SEEN_TITLE["$t"]="${VAULT_FILES[$i]}"
-    fi
-  fi
+      ;;
+  esac
 done
 
-if [ $DUPLICATES_FOUND -eq 0 ]; then
-  echo "✅ No duplicates detected"
+# Check for similar titles using sorted normalized titles
+while IFS= read -r file; do
+  title=$(grep -m1 '^# ' "$file" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+  if [ -n "$title" ]; then
+    echo "$title  $file"
+  fi
+done < "$TMPDIR/files.txt" | sort > "$TMPDIR/titles.txt"
+
+awk '
+{
+  title = ""
+  fname = ""
+  # First field(s) = title (separated by double space from filename)
+  # But titles may contain spaces — find the "  " separator
+  sep = index($0, "  ")
+  if (sep > 0) {
+    title = substr($0, 1, sep - 1)
+    fname = substr($0, sep + 2)
+  }
+  if (title == prev_title && title != "") {
+    print "SIMILAR: " fname
+    print "SIMILAR_PREV: " prev_file
+  }
+  prev_title = title
+  prev_file = fname
+}
+' "$TMPDIR/titles.txt" | while IFS= read -r line; do
+  case "$line" in
+    SIMILAR:\ *)
+      f=$(echo "$line" | sed 's/^SIMILAR: //')
+      echo "  - $(basename "$f")"
+      ;;
+    SIMILAR_PREV:\ *)
+      f=$(echo "$line" | sed 's/^SIMILAR_PREV: //')
+      echo "  - $(basename "$f")"
+      DUPLICATES_FOUND=1
+      ;;
+  esac
+done
+
+if [ "$DUPLICATES_FOUND" -eq 0 ]; then
+  echo "No duplicates detected"
   echo ""
   echo "Vault is clean. To mark a note as deprecated, add to its frontmatter:"
   echo "  deprecated: true"

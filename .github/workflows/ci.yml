@@ -30,6 +30,18 @@ jobs:
         with:
           scandir: './scripts'
 
+      - name: Bash 3.2 compatibility check
+        run: |
+          # Verify scripts don't use Bash 4+ features (associative arrays, mapfile, etc.)
+          for f in scripts/*.sh; do
+            if grep -qE '(declare -A|mapfile|readarray|\$\{[a-zA-Z_]+,,\}|\[\[.*=\~)' "$f"; then
+              echo "FAIL: $f uses Bash 4+ features"
+              grep -nE '(declare -A|mapfile|readarray|\$\{[a-zA-Z_]+,,\}|\[\[.*=\~)' "$f"
+              exit 1
+            fi
+          done
+          echo "All scripts are Bash 3.2 compatible"
+
       - name: Node syntax check
         run: |
           node --check hooks/stratavarious-stop.js
