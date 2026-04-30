@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
-  <img src="https://img.shields.io/badge/version-1.5.0-6c5ce7?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.6.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
 </p>
 
@@ -59,6 +59,12 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 │      │              │              │                     │
 │      ▼              ▼              ▼                     │
 │  ┌──────────────────────────────────────────┐            │
+│  │        SessionStart Hook (automatic)     │            │
+│  │   Injects STRATA.md into fresh session   │            │
+│  └────────────────┬─────────────────────────┘            │
+│                   │                                      │
+│                   ▼                                      │
+│  ┌──────────────────────────────────────────┐            │
 │  │           Stop Hook (automatic)          │            │
 │  │        Captures session data on exit     │            │
 │  └────────────────┬─────────────────────────┘            │
@@ -67,13 +73,16 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 │  │       /stratavarious consolidation       │            │
 │  │                                          │            │
 │  │  Phase 0 — Capture intentions            │            │
-│  │    Ask next steps before consolidating  │            │
+│  │    Ask next steps before consolidating   │            │
 │  │                                          │            │
 │  │  Phase 1 — Read buffer                   │            │
 │  │    Load raw session capture              │            │
 │  │                                          │            │
 │  │  Phase 2 — Analyze session               │            │
 │  │    Identify decisions, errors, patterns  │            │
+│  │                                          │            │
+│  │  Phase 3a — Write STRATA.md  ◄── NEW     │            │
+│  │    Portable handoff at project root      │            │
 │  │                                          │            │
 │  │  Phase 3 — Write to working memory       │            │
 │  │    Update STRATAVARIOUS.md (last 3)      │            │
@@ -123,13 +132,21 @@ Durable notes organized by theme persist across all sessions. Over time, the vau
 
 The Stop hook runs transparently after each Claude response. It reads the session transcript to extract user intent, tool operations, file changes, and errors — then writes structured data to a buffer. No user action required.
 
+### Portable Handoff File
+
+After each `/stratavarious`, a `STRATA.md` file is written to the root of the current git project. It contains a structured summary of the session: goal, decisions, files modified, what worked, dead ends, errors, and next steps. You can pass this file directly to a fresh session — no copy-pasting, no re-explaining.
+
+### Auto-Injection on Session Start
+
+A `SessionStart` hook detects `STRATA.md` at the current project root and automatically injects its content into the new session's context. The next session starts with the handoff already loaded — you don't have to do anything.
+
 ### Handoff Replacement
 
-`/stratavarious` replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. The session summary in `STRATAVARIOUS.md` serves as a complete handoff document: what was done, what was decided, what failed, and where to pick up next. Next session loads it automatically.
+`/stratavarious` fully replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. Those feed directly into `STRATA.md` and `STRATAVARIOUS.md`. Next session loads both automatically.
 
 ### Consolidation Pipeline
 
-Running `/stratavarious` triggers an 8-phase pipeline: capture intentions → read conversation + buffer → analyze → write to working memory → security scan → archive to vault → git commit → cleanup.
+Running `/stratavarious` triggers a 9-phase pipeline: capture intentions → read conversation + buffer → analyze → write STRATA.md → write to working memory → security scan → archive to vault → git commit → cleanup.
 
 ### Security Scan
 
@@ -169,6 +186,9 @@ Next time you start Claude Code, your context is already there. The working memo
 ## Architecture
 
 ```
+<your-project>/
+└── STRATA.md                   ← Portable handoff (written by /strata, injected at next SessionStart)
+
 ~/.claude/workspace/stratavarious/
 └── memory/
     ├── STRATAVARIOUS.md        ← Working memory (last 3 sessions, auto-loaded)
@@ -187,8 +207,8 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 
 | Command | Description |
 |---|---|
-| `/stratavarious` | Run the full 8-phase consolidation pipeline — captures intentions, analyzes the conversation, writes handoff-quality summary to working memory, archives to vault, commits to git |
-| `/strata` | Alias de `/stratavarious` — même pipeline, nom plus court |
+| `/stratavarious` | Run the full 9-phase consolidation pipeline — captures intentions, analyzes the conversation, writes `STRATA.md` to project root, updates working memory, archives to vault, commits to git |
+| `/strata` | Alias for `/stratavarious` — same pipeline, shorter name |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 
 ## Scripts
