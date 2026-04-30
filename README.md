@@ -243,13 +243,7 @@ StrataVarious includes a built-in secret scanner that runs before any data enter
 - Secrets embedded in non-standard locations
 - Base64-encoded credentials that don't match known patterns
 
-**Hardening built in:**
-- Invisible Unicode (zero-width spaces, BOM, TAG chars) is stripped **before** secret scrubbing, so attackers can't bypass the redactor by injecting ZWSP into a key.
-- The Stop hook never invokes a shell to write the buffer (`execFile`, not `exec`), removing a command-injection vector via `STRATAVARIOUS_HOME`.
-- The buffer file is opened with `O_NOFOLLOW` to defeat symlink-redirection attacks.
-- `transcript_path` from the harness is validated: must be absolute, end in `.jsonl`, and live under `~/.claude/projects/`.
-- `STRATA.md` is auto-loaded at SessionStart but flagged as **untrusted content** in the additional context — Claude treats it as data, not as instructions, so a malicious repo cannot inject commands via a planted handoff file.
-- Error logs mask `$HOME` to avoid leaking usernames or absolute paths.
+**`STRATA.md` from cloned repos:** The auto-injection at session start treats `STRATA.md` as untrusted data, not as instructions. A malicious repo cannot use a planted handoff file to make Claude run commands.
 
 **Recommendations:**
 - Avoid pasting raw secrets into Claude Code sessions
