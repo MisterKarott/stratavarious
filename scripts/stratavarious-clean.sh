@@ -80,7 +80,7 @@ done
 
 # Check for similar titles using sorted normalized titles
 while IFS= read -r file; do
-  title=$(grep -m1 '^# ' "$file" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+  title=$(grep -m1 '^# ' "$file" 2>/dev/null | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
   if [ -n "$title" ]; then
     echo "$title  $file"
   fi
@@ -130,6 +130,39 @@ else
   echo "  1. Merge content if they cover the same topic"
   echo "  2. Mark as deprecated if one is obsolete"
   echo "  3. Delete exact duplicates"
+fi
+
+# Phase 3: Semantic deduplication via Claude API
+# Only runs if Node.js is available and ANTHROPIC_API_KEY is set
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SEMANTIC_SCRIPT="${SCRIPT_DIR}/stratavarious-semantique-dedup.js"
+
+if [ -f "$SEMANTIC_SCRIPT" ] && command -v node >/dev/null 2>&1 && [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  # Collect similar pairs from title dedup
+  if [ -f "$TMPDIR/titles.txt" ]; then
+    SIMILAR_PAIRS=$(awk '
+    {
+      title = ""
+      fname = ""
+      sep = index($0, "  ")
+      if (sep > 0) {
+        title = substr($0, 1, sep - 1)
+        fname = substr($0, sep + 2)
+      }
+      if (title == prev_title && title != "" && prev_file != "") {
+        print prev_file "\t" fname
+      }
+      prev_title = title
+      prev_file = fname
+    }
+    ' "$TMPDIR/titles.txt")
+
+    if [ -n "$SIMILAR_PAIRS" ]; then
+      echo ""
+      echo "### Semantic deduplication (Claude API) ###"
+      echo "$SIMILAR_PAIRS" | node "$SEMANTIC_SCRIPT" 2>/dev/null || true
+    fi
+  fi
 fi
 
 echo ""

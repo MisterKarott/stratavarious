@@ -257,19 +257,44 @@ function truncateBuffer() {
     _lastBufferCheck = now;
 
     if (currentSize > MAX_BUFFER_SIZE) {
-      // Atomic rewrite under the same flock used by the write wrapper.
-      // tmp file in same dir → atomic rename; concurrent appenders block on the lock.
-      const lockFile = path.join(path.dirname(BUFFER_PATH), '.vault.lock');
+      // Atomic rewrite using mkdir-based lock (same as write.sh, no flock needed)
+      const lockDir = path.join(path.dirname(BUFFER_PATH), '.vault.lock.d');
+      const lockPidFile = path.join(lockDir, 'pid');
       const tmpPath = BUFFER_PATH + '.tmp.' + process.pid;
       const header = '# Session Buffer\n\n> Raw capture from Stop hook. Consumed by /stratavarious, then emptied.\n\n';
-      try {
-        execFileSync('bash', ['-c',
-          'exec 9>"$1"; flock -w 30 9 || exit 1; ' +
-          'tail -c 307200 "$2" > "$3" && ' +
-          'printf "%s" "$4" | cat - "$3" > "$3.cat" && mv "$3.cat" "$2" && rm -f "$3"'
-        , '_', lockFile, BUFFER_PATH, tmpPath, header], { timeout: 35000, stdio: 'ignore' });
-      } catch {
-        // flock missing or failed: skip truncation rather than risk a torn write
+
+      for (let attempt = 0; attempt < 30; attempt++) {
+        try {
+          fs.mkdirSync(lockDir, { recursive: false }); // atomic, fails if exists
+          fs.writeFileSync(lockPidFile, String(process.pid));
+          // Lock acquired — perform truncation
+          const content = fs.readFileSync(BUFFER_PATH, 'utf8');
+          const truncated = header + content.slice(-307200);
+          fs.writeFileSync(tmpPath, truncated, 'utf8');
+          fs.renameSync(tmpPath, BUFFER_PATH); // atomic rename
+          // Cleanup lock
+          try { fs.rmSync(lockPidFile, { force: true }); } catch {}
+          try { fs.rmdirSync(lockDir); } catch {}
+          break;
+        } catch (err) {
+          if (err.code === 'EEXIST') {
+            // Lock held — check if stale
+            try {
+              const pid = parseInt(fs.readFileSync(lockPidFile, 'utf8'), 10);
+              if (pid > 0) process.kill(pid, 0); // throws if dead
+            } catch {
+              // Stale lock — remove and retry
+              try { fs.rmSync(lockPidFile, { force: true }); } catch {}
+              try { fs.rmdirSync(lockDir); } catch {}
+              continue;
+            }
+            // Lock held by live process — wait
+            if (attempt >= 29) break;
+            try { execFileSync('sleep', ['1']); } catch {}
+            continue;
+          }
+          break; // other error — give up
+        }
       }
     }
   } catch {

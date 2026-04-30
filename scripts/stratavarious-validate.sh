@@ -55,6 +55,7 @@ validate_file() {
     date = ""
     categorie = ""
     tags = ""
+    projet = ""
     n = split(fm_lines, lines, "\n")
     for (i = 1; i <= n; i++) {
       line = lines[i]
@@ -62,13 +63,69 @@ validate_file() {
         date = substr(line, RSTART + RLENGTH)
       } else if (match(line, /^categorie:[[:space:]]*/)) {
         categorie = substr(line, RSTART + RLENGTH)
-      } else if (match(line, /^category:[[:space:]]*/)) {
-        if (categorie == "") categorie = substr(line, RSTART + RLENGTH)
       } else if (match(line, /^tags:[[:space:]]*/)) {
         tags = substr(line, RSTART + RLENGTH)
+      } else if (match(line, /^projet:[[:space:]]*/)) {
+        projet = substr(line, RSTART + RLENGTH)
       }
     }
-    print date "|" categorie "|" tags
+
+    # Trim whitespace from all values
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", date)
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", categorie)
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", tags)
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", projet)
+
+    # Strip surrounding quotes from values
+    strip_quotes(date)
+    strip_quotes(categorie)
+    strip_quotes(projet)
+
+    # Strip inline comments (not inside quotes)
+    strip_comments(date)
+    strip_comments(categorie)
+    strip_comments(projet)
+
+    # Normalize array-style tags: [a, b, c] → #a #b #c
+    if (tags ~ /^\[/) {
+      gsub(/[\[\]'"[:space:]]+/, " ", tags)
+      gsub(/,/, " ", tags)
+      n_tags = split(tags, tag_parts, " ")
+      tags = ""
+      for (j = 1; j <= n_tags; j++) {
+        if (tag_parts[j] != "") {
+          if (tags != "") tags = tags " "
+          if (substr(tag_parts[j], 1, 1) != "#") tag_parts[j] = "#" tag_parts[j]
+          tags = tags tag_parts[j]
+        }
+      }
+    } else {
+      strip_quotes(tags)
+      strip_comments(tags)
+    }
+
+    print date "|" categorie "|" tags "|" projet
+  }
+
+  function strip_quotes(field) {
+    if (length(field) >= 2) {
+      q1 = substr(field, 1, 1)
+      q2 = substr(field, length(field), 1)
+      if ((q1 == "\"" && q2 == "\"") || (q1 == "'" && q2 == "'")) {
+        field = substr(field, 2, length(field) - 2)
+      }
+    }
+  }
+
+  function strip_comments(field) {
+    # Only strip if field does not start with a quote
+    if (length(field) > 0 && substr(field, 1, 1) != "\"" && substr(field, 1, 1) != "'") {
+      pos = index(field, " #")
+      if (pos > 0) {
+        field = substr(field, 1, pos - 1)
+        gsub(/[[:space:]]+$/, "", field)
+      }
+    }
   }
   ' "$file")
 
@@ -90,10 +147,11 @@ validate_file() {
       ;;
   esac
 
-  local date categorie tags
+  local date categorie tags projet
   date=$(echo "$result" | cut -d'|' -f1)
   categorie=$(echo "$result" | cut -d'|' -f2)
   tags=$(echo "$result" | cut -d'|' -f3)
+  projet=$(echo "$result" | cut -d'|' -f4)
 
   if [ -z "$date" ]; then
     echo "FAIL $basename — missing date"
@@ -101,24 +159,27 @@ validate_file() {
   elif ! echo "$date" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
     echo "FAIL $basename — invalid date format: $date (expected YYYY-MM-DD)"
     ERRORS=$((ERRORS + 1))
+  elif [ "$date" \> "$(date +%Y-%m-%d)" ]; then
+    echo "WARN $basename — date is in the future: $date"
   fi
 
   if [ -z "$categorie" ]; then
-    echo "FAIL $basename — missing category"
+    echo "FAIL $basename — missing categorie"
     ERRORS=$((ERRORS + 1))
   elif ! echo " $VALID_CATEGORIES " | grep -q " $categorie "; then
-    echo "FAIL $basename — invalid category: $categorie"
+    echo "FAIL $basename — invalid categorie: $categorie"
     ERRORS=$((ERRORS + 1))
   fi
 
   if [ -z "$tags" ]; then
     echo "FAIL $basename — missing tags"
     ERRORS=$((ERRORS + 1))
+  elif ! echo "$tags" | grep -qE '#[a-zA-Z0-9_-]+'; then
+    echo "WARN $basename — tags may be malformed (expected #tag format): $tags"
   fi
 }
 
 # Process all .md files (excluding journal/ and sessions/)
-# Use a temp file to count errors across the pipe subshell boundary (Bash 3.2 compatible)
 ERROR_COUNT_FILE=$(mktemp)
 echo "0" > "$ERROR_COUNT_FILE"
 

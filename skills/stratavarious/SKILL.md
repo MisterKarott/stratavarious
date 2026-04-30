@@ -209,11 +209,16 @@ If any check detects issues: isolate the content, warn the user, do NOT write. T
 
 Distill the ejected session's valuable content into the vault. This is the most important phase — it's where raw session data becomes durable knowledge. This phase only runs after Phase 4 security scan has passed.
 
-1. **Check existing vault notes** — read `vault/*.md` and MEMORY.md first. Don't duplicate.
+1. **Check existing vault notes** — read `vault/*.md` and MEMORY.md first. Don't duplicate. Before creating a new vault note, check if an existing note already covers the same topic. If so, merge the new information into it rather than creating a duplicate. Use your judgment — two notes about "React error boundaries" should be merged; two notes about "React setup" and "React testing" should not.
 2. **Thematic notes** — distribute durable facts into existing `vault/*.md` notes or create new ones. Use the `categorie` field to classify.
 3. **Profile** — if the session revealed new user preferences or habits, update `profile.md`. This file consolidates everything known about the user's working style: preferred tools, coding habits, communication patterns, recurring workflows. It's the one place where user knowledge accumulates across sessions.
 4. **Journal** — append a one-paragraph summary to `vault/journal/YYYY-MM-DD.md`
-5. **MEMORY.md** — update the index. Each entry: `- \`note-name.md\` — short description`. Group by theme.
+5. **MEMORY.md** — rebuild the vault index using the build script:
+   ```bash
+   PLUGIN_ROOT=$(node -e "try{require('fs').realpathSync('${CLAUDE_PLUGIN_ROOT}')}catch(e){}" 2>/dev/null)
+   bash "${PLUGIN_ROOT}/scripts/stratavarious-memory-build.sh" "${PROJECT_NAME}"
+   ```
+   This generates a filtered index capped at 200 lines. If `CLAUDE_PLUGIN_ROOT` is unavailable, skip this step.
 
 When creating or updating vault notes, always use frontmatter:
 

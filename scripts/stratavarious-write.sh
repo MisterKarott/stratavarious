@@ -1,8 +1,8 @@
 #!/bin/bash
-# stratavarious-write.sh — File-locked vault write wrapper
+# stratavarious-write.sh — POSIX-atomic vault write wrapper (no flock dependency)
 # Called from the JS hook to ensure safe concurrent writes.
-# Usage: stratavarious-write.sh <target-file> <content>
-# If flock is not available, proceeds without locking (with warning).
+# Usage: stratavarious-write.sh <target-file>  (reads content from stdin)
+# Uses mkdir-based locking — works on all Unix systems including macOS.
 
 set -euo pipefail
 
@@ -10,7 +10,9 @@ TARGET_FILE="$1"
 shift
 
 STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
-LOCK_FILE="${STRATAVARIOUS_HOME}/memory/.vault.lock"
+LOCK_DIR="${STRATAVARIOUS_HOME}/memory/.vault.lock.d"
+LOCK_PID_FILE="${LOCK_DIR}/pid"
+LOCK_TIMEOUT=30
 
 # Ensure parent directory exists
 mkdir -p "$(dirname "$TARGET_FILE")"
@@ -21,19 +23,39 @@ if [ -L "$TARGET_FILE" ]; then
   exit 1
 fi
 
-# Try flock if available, otherwise proceed without locking
-if command -v flock >/dev/null 2>&1; then
-  exec 9>"$LOCK_FILE"
-  if ! flock -w 30 9; then
-    echo "stratavarious: vault lock timeout (30s)" >&2
-    exit 1
-  fi
-  # Write within lock
-  cat >> "$TARGET_FILE"
-  # Lock released when fd 9 closes at script exit
-else
-  # No flock: serialize via O_APPEND + small write only. Concurrent appends
-  # under PIPE_BUF (4096 on Linux/macOS) are atomic in POSIX.
-  echo "stratavarious: flock not found — relying on O_APPEND atomicity (install util-linux/flock for stronger guarantees)" >&2
-  cat >> "$TARGET_FILE"
+# Acquire lock via atomic mkdir (POSIX, works on macOS without flock)
+acquire_lock() {
+  local elapsed=0
+  while [ "$elapsed" -lt "$LOCK_TIMEOUT" ]; do
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      echo "$$" > "$LOCK_PID_FILE"
+      return 0
+    fi
+    # Lock held — check if holder is still alive (stale lock detection)
+    if [ -f "$LOCK_PID_FILE" ]; then
+      local lock_pid
+      lock_pid=$(cat "$LOCK_PID_FILE" 2>/dev/null || echo 0)
+      if [ "$lock_pid" -ne 0 ] && ! kill -0 "$lock_pid" 2>/dev/null; then
+        rmdir "$LOCK_DIR" 2>/dev/null || true
+        continue
+      fi
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  return 1
+}
+
+release_lock() {
+  rm -f "$LOCK_PID_FILE" 2>/dev/null
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+
+trap release_lock EXIT
+
+if ! acquire_lock; then
+  echo "stratavarious: vault lock timeout (${LOCK_TIMEOUT}s)" >&2
+  exit 1
 fi
+
+cat >> "$TARGET_FILE"
