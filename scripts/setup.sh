@@ -9,6 +9,19 @@ VAULT_DIR="$MEMORY_DIR/vault"
 JOURNAL_DIR="$VAULT_DIR/journal"
 SESSIONS_DIR="$VAULT_DIR/sessions"
 TEMPLATE_DIR="$PLUGIN_ROOT/templates"
+LOCK_FILE="$STRATAVARIOUS_HOME/memory/.vault.lock"
+
+acquire_lock() {
+  if command -v flock >/dev/null 2>&1; then
+    exec 9>"$LOCK_FILE"
+    if ! flock -w 30 9; then
+      echo "Error: vault lock timeout (30s)" >&2
+      exit 1
+    fi
+  fi
+}
+
+acquire_lock
 
 echo "StrataVarious setup..."
 echo "Vault path: $STRATAVARIOUS_HOME"
