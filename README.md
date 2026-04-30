@@ -214,6 +214,29 @@ StrataVarious is selective by design. Not everything in a session is worth remem
 
 No data ever leaves your machine. There is no telemetry, no analytics, no phone-home. The vault is yours.
 
+## Security
+
+StrataVarious includes a built-in secret scanner that runs before any data enters the vault. It detects and redacts:
+
+- API keys (Stripe, OpenAI, Anthropic, AWS, GitHub, Slack, Google)
+- Bearer and Basic authentication headers
+- Database connection strings (MongoDB, PostgreSQL, MySQL, Redis)
+- Passwords in key-value assignments (`password=...`, `api_key: ...`)
+- JWT tokens
+- HTTP basic auth in URLs
+
+**Important limitations:** The scanner uses pattern matching (regex). It cannot guarantee detection of all possible secret formats, especially:
+- Custom or proprietary key formats
+- Secrets embedded in non-standard locations
+- Base64-encoded credentials that don't match known patterns
+
+**Recommendations:**
+- Avoid pasting raw secrets into Claude Code sessions
+- Use environment variables or secret managers instead of hardcoding values
+- Consider [gitleaks](https://github.com/gitleaks/gitleaks) or [trufflehog](https://github.com/trufflesecurity/trufflehog) as complementary tools for comprehensive secret detection
+
+StrataVarious reduces the risk of secrets entering the vault, but does not eliminate it.
+
 ## Configuration
 
 | Variable | Default | Description |
