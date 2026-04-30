@@ -311,16 +311,10 @@ function main() {
     // No stdin or invalid JSON — use defaults
   }
 
-  // Detect if file modifications occurred (Write/Edit/MultiEdit tools)
-  const hasFileModifications = transcriptInfo.toolCalls.some(t =>
-    t.name === 'write_file' || t.name === 'edit' || t.name === 'multi_edit' ||
-    t.name === 'Write' || t.name === 'Edit' || t.name === 'MultiEdit'
-  );
-  const modifiedFiles = getModifiedFiles(cwd, hasFileModifications);
-  const project = getProjectName(cwd);
+  // Initialize transcriptInfo early to avoid TDZ
+  let transcriptInfo = { userMessages: [], toolCalls: [], errors: [] };
 
   // Try to extract rich context from transcript
-  let transcriptInfo = { userMessages: [], toolCalls: [], errors: [] };
   if (transcriptPath) {
     try {
       const lines = readLastNLines(transcriptPath, 40);
@@ -329,6 +323,14 @@ function main() {
       // Transcript unreadable — fall back to lightweight
     }
   }
+
+  // Detect if file modifications occurred (Write/Edit/MultiEdit tools)
+  const hasFileModifications = transcriptInfo.toolCalls.some(t =>
+    t.name === 'write_file' || t.name === 'edit' || t.name === 'multi_edit' ||
+    t.name === 'Write' || t.name === 'Edit' || t.name === 'MultiEdit'
+  );
+  const modifiedFiles = getModifiedFiles(cwd, hasFileModifications);
+  const project = getProjectName(cwd);
 
   // Build structured entry
   let entry = `\n## ${timestamp}\n`;
