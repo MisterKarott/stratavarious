@@ -374,11 +374,18 @@ function main() {
   // Guard buffer size
   truncateBuffer();
 
-  // Append
+  // Append via locked write wrapper
   try {
     fs.mkdirSync(path.dirname(BUFFER_PATH), { recursive: true });
-    fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'stratavarious-write.sh');
+    execSync(`bash "${scriptPath}" "${BUFFER_PATH}"`, { input: entry, encoding: 'utf8', timeout: 35000 });
   } catch (error) {
+    // Fallback to direct write if wrapper fails
+    try {
+      fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
+    } catch (fbError) {
+      logHookError(fbError, 'append-buffer-fallback');
+    }
     logHookError(error, 'append-buffer');
     process.exit(0);
   }
