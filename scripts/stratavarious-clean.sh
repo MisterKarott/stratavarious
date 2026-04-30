@@ -31,7 +31,9 @@ find "$VAULT_DIR" -type f -name "*.md" -print0 2>/dev/null | while IFS= read -r 
   echo "$file"
 done > "$TMPDIR/files.txt"
 
-FILE_COUNT=$(wc -l < "$TMPDIR/files.txt" | tr -d ' ')
+# Count by lines — newlines in filenames are vanishingly rare in this vault,
+# but skip any line that doesn't start with the vault dir to be safe.
+FILE_COUNT=$(grep -c "^${VAULT_DIR}" "$TMPDIR/files.txt" 2>/dev/null || echo 0)
 
 if [ "$FILE_COUNT" -eq 0 ]; then
   echo "No vault files found."

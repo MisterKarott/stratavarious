@@ -19,13 +19,13 @@ acquire_lock() {
   fi
 }
 
-acquire_lock
-
 echo "StrataVarious setup..."
 echo "Vault path: $STRATAVARIOUS_HOME"
 
-# 1. Create per-project vault structure
+# 1. Create per-project vault structure (must precede lock — LOCK_FILE lives under MEMORY_DIR)
 mkdir -p "$MEMORY_DIR" "$VAULT_DIR" "$VAULT_DIR/_global"
+
+acquire_lock
 for cat in decisions conventions patterns errors skills environments; do
   mkdir -p "$VAULT_DIR/_global/$cat"
 done

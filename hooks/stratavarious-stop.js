@@ -6,9 +6,11 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
-const STRATAVARIOUS_HOME = process.env.STRATAVARIOUS_HOME || path.join(os.homedir(), '.claude', 'workspace', 'stratavarious');
+// Canonicalize STRATAVARIOUS_HOME: resolve to absolute path, strip NUL, reject relative.
+const _rawHome = process.env.STRATAVARIOUS_HOME || path.join(os.homedir(), '.claude', 'workspace', 'stratavarious');
+const STRATAVARIOUS_HOME = path.resolve(_rawHome).replace(/\0/g, '');
 const BUFFER_PATH = path.join(STRATAVARIOUS_HOME, 'memory', 'session-buffer.md');
 const _parsed = parseInt(process.env.STRATAVARIOUS_MAX_BUFFER, 10);
 const MAX_BUFFER_SIZE = (Number.isFinite(_parsed) && _parsed > 0) ? _parsed : (500 * 1024);
@@ -27,8 +29,6 @@ const LABELED_PATTERNS = [
 const SIMPLE_PATTERNS = [
   // Stripe (les vraies clés Stripe ont un underscore) — unified pattern
   /\b(sk|rk)_(live|test)_[a-zA-Z0-9]{20,}\b/g,
-  // OpenAI / Anthropic (tirets inclus dans le corps de la clé, ex: sk-proj-XXX, sk-ant-api03-XXX)
-  /\bsk-[a-zA-Z0-9-]{20,}\b/g,
   // AWS
   /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g,
   // GitHub
@@ -81,10 +81,7 @@ function scrubSecrets(text) {
 
   // Simple patterns: redact entire match
   for (const pattern of SIMPLE_PATTERNS) {
-    cleaned = cleaned.replace(pattern, (match) => {
-      if (match.length <= 8) return '[REDACTED]';
-      return match.substring(0, 4) + '...' + '[REDACTED]';
-    });
+    cleaned = cleaned.replace(pattern, (match) => match.substring(0, 4) + '...' + '[REDACTED]');
   }
   return cleaned;
 }
@@ -140,7 +137,10 @@ function logHookError(err, context) {
   try {
     const errorLog = path.join(STRATAVARIOUS_HOME, 'memory', '.hook-errors.log');
     const timestamp = new Date().toISOString();
-    const message = `${timestamp} [${context}] ${err.message}\n${err.stack}\n`;
+    // Mask homedir in messages/stack traces to avoid leaking username/paths.
+    const home = os.homedir();
+    const mask = (s) => (s || '').split(home).join('~');
+    const message = `${timestamp} [${context}] ${mask(err.message)}\n${mask(err.stack)}\n`;
     fs.appendFileSync(errorLog, message, 'utf8');
   } catch {
     // Last-resort: stderr (fallback only)
@@ -279,22 +279,39 @@ function truncateBuffer() {
     _lastBufferCheck = now;
 
     if (currentSize > MAX_BUFFER_SIZE) {
-      const content = fs.readFileSync(BUFFER_PATH, 'utf8');
-      const truncated = content.slice(-(300 * 1024));
+      // Atomic rewrite under the same flock used by the write wrapper.
+      // tmp file in same dir → atomic rename; concurrent appenders block on the lock.
+      const lockFile = path.join(path.dirname(BUFFER_PATH), '.vault.lock');
+      const tmpPath = BUFFER_PATH + '.tmp.' + process.pid;
       const header = '# Session Buffer\n\n> Raw capture from Stop hook. Consumed by /stratavarious, then emptied.\n\n';
-      fs.writeFileSync(BUFFER_PATH, header + truncated, 'utf8');
+      try {
+        execFileSync('bash', ['-c',
+          'exec 9>"$1"; flock -w 30 9 || exit 1; ' +
+          'tail -c 307200 "$2" > "$3" && ' +
+          'printf "%s" "$4" | cat - "$3" > "$3.cat" && mv "$3.cat" "$2" && rm -f "$3"'
+        , '_', lockFile, BUFFER_PATH, tmpPath, header], { timeout: 35000, stdio: 'ignore' });
+      } catch {
+        // flock missing or failed: skip truncation rather than risk a torn write
+      }
     }
   } catch {
     // File doesn't exist yet
   }
 }
 
+// Honor .strataignore only if it contains an explicit opt-out token.
+// Prevents an attacker-planted file from silently disabling the hook.
 function shouldIgnore(cwd) {
   try {
     const ignorePath = path.join(cwd, '.strataignore');
-    if (!fs.existsSync(ignorePath)) return false;
-    const content = fs.readFileSync(ignorePath, 'utf8').trim();
-    return content.split('\n').some(l => l.trim() && !l.startsWith('#'));
+    const lst = fs.lstatSync(ignorePath);
+    if (lst.isSymbolicLink()) return false;
+    const content = fs.readFileSync(ignorePath, 'utf8');
+    const optOut = content.split('\n').some(l => l.trim() === 'disable' || l.trim() === 'ignore');
+    if (optOut) {
+      logHookError(new Error(`opt-out via .strataignore at ${ignorePath}`), 'strataignore');
+    }
+    return optOut;
   } catch {
     return false;
   }
@@ -309,14 +326,33 @@ function main() {
   let transcriptPath = null;
 
   try {
-    const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+    // Cap stdin to 1 MiB to avoid OOM on adversarial input
+    const STDIN_MAX = 1024 * 1024;
+    const buf = Buffer.alloc(STDIN_MAX);
+    let read = 0;
+    try {
+      read = fs.readSync(0, buf, 0, STDIN_MAX, null);
+    } catch { /* EAGAIN / no stdin */ }
+    const input = JSON.parse(buf.slice(0, read).toString('utf8'));
     // Validate cwd is a string to avoid injection (though execSync cwd doesn't evaluate as shell)
     if (input.cwd && typeof input.cwd === 'string') {
       cwd = input.cwd;
     }
-    // Validate transcript_path is a string
+    // Validate transcript_path: must be a string, absolute, .jsonl, no traversal,
+    // and located under the Claude projects dir (where the harness writes them).
     if (input.transcript_path && typeof input.transcript_path === 'string') {
-      transcriptPath = input.transcript_path;
+      const tp = input.transcript_path;
+      const expectedRoot = path.join(os.homedir(), '.claude', 'projects');
+      const resolved = path.resolve(tp);
+      if (
+        path.isAbsolute(tp) &&
+        resolved === tp &&
+        !tp.includes('\0') &&
+        tp.endsWith('.jsonl') &&
+        resolved.startsWith(expectedRoot + path.sep)
+      ) {
+        transcriptPath = resolved;
+      }
     }
   } catch {
     // No stdin or invalid JSON — use defaults
@@ -385,22 +421,32 @@ function main() {
 
   entry += '\n';
 
-  // Scrub secrets and invisible Unicode before any disk write
-  entry = scrubSecrets(entry);
+  // Strip invisible Unicode FIRST so secrets can't bypass scrubbing via ZWSP/etc.
   entry = stripInvisibleUnicode(entry);
+  entry = scrubSecrets(entry);
 
   // Guard buffer size
   truncateBuffer();
 
-  // Append via locked write wrapper
+  // Append via locked write wrapper. Refuse to follow symlinks to prevent
+  // attacker-controlled redirects to sensitive files.
   try {
     fs.mkdirSync(path.dirname(BUFFER_PATH), { recursive: true });
-    const scriptPath = path.join(__dirname, '..', 'scripts', 'stratavarious-write.sh');
-    execSync(`bash "${scriptPath}" "${BUFFER_PATH}"`, { input: entry, encoding: 'utf8', timeout: 35000 });
-  } catch (error) {
-    // Fallback to direct write if wrapper fails
     try {
-      fs.appendFileSync(BUFFER_PATH, entry, 'utf8');
+      const lst = fs.lstatSync(BUFFER_PATH);
+      if (lst.isSymbolicLink()) {
+        logHookError(new Error(`refusing symlink: ${BUFFER_PATH}`), 'symlink-guard');
+        process.exit(0);
+      }
+    } catch { /* file doesn't exist yet — fine */ }
+
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'stratavarious-write.sh');
+    execFileSync('bash', [scriptPath, BUFFER_PATH], { input: entry, encoding: 'utf8', timeout: 35000 });
+  } catch (error) {
+    // Fallback to direct write if wrapper fails — open with O_NOFOLLOW
+    try {
+      const fd = fs.openSync(BUFFER_PATH, fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW, 0o600);
+      try { fs.writeSync(fd, entry, null, 'utf8'); } finally { fs.closeSync(fd); }
     } catch (fbError) {
       logHookError(fbError, 'append-buffer-fallback');
     }
