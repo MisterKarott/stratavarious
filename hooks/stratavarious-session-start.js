@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
 const MAX_LINES = 200;
@@ -29,10 +30,21 @@ function getProjectRoot(cwd) {
   }
 }
 
+function loadProfile() {
+  try {
+    const home = process.env.STRATAVARIOUS_HOME || path.join(os.homedir(), '.claude', 'workspace', 'stratavarious');
+    const profilePath = path.join(home, 'memory', 'profile.md');
+    if (fs.existsSync(profilePath)) {
+      const content = fs.readFileSync(profilePath, 'utf8').trim();
+      if (content.length > 50) return content;
+    }
+  } catch { /* profile unreadable — skip */ }
+  return null;
+}
+
 function main() {
   let input = {};
   try {
-    // Use fs.readFileSync(0, 'utf8') for cross-platform stdin reading (0 = stdin fd)
     const raw = fs.readFileSync(0, 'utf8');
     if (raw.trim()) input = JSON.parse(raw);
   } catch {
@@ -43,9 +55,16 @@ function main() {
   const cwd = input.cwd || process.cwd();
   const projectRoot = getProjectRoot(cwd);
   const strataPath = path.join(projectRoot, 'STRATA.md');
+  const profile = loadProfile();
 
   if (!fs.existsSync(strataPath)) {
-    process.stdout.write('{}');
+    if (profile) {
+      process.stdout.write(JSON.stringify({
+        additionalContext: '[StrataVarious] User profile loaded:\n\n' + profile,
+      }));
+    } else {
+      process.stdout.write('{}');
+    }
     return;
   }
 
@@ -68,10 +87,9 @@ function main() {
         ? lines.slice(0, MAX_LINES).join('\n') + '\n\n[... truncated after 200 lines ...]'
         : content;
 
-      const result = {
-        additionalContext: `[StrataVarious] Previous session handoff loaded from STRATA.md:\n\n${body}`,
-      };
-      process.stdout.write(JSON.stringify(result));
+      let additionalContext = `[StrataVarious] Previous session handoff loaded from STRATA.md:\n\n${body}`;
+      if (profile) additionalContext += '\n\n[StrataVarious] User profile loaded:\n\n' + profile;
+      process.stdout.write(JSON.stringify({ additionalContext }));
       return;
     }
 
@@ -83,9 +101,9 @@ function main() {
       ? lines.slice(0, MAX_LINES).join('\n') + '\n\n[... truncated after 200 lines ...]'
       : content;
 
-    const result = {
-      additionalContext: `[StrataVarious] Previous session handoff loaded from STRATA.md:\n\n${body}`,
-    };
+    let additionalContext = `[StrataVarious] Previous session handoff loaded from STRATA.md:\n\n${body}`;
+    if (profile) additionalContext += '\n\n[StrataVarious] User profile loaded:\n\n' + profile;
+    process.stdout.write(JSON.stringify({ additionalContext }));
     process.stdout.write(JSON.stringify(result));
   } catch {
     process.stdout.write('{}');
