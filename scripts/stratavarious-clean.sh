@@ -69,7 +69,7 @@ awk '
 ' "$TMPDIR/hashed.txt" | while IFS= read -r line; do
   case "$line" in
     DUP:\ *)
-      f=$(echo "$line" | sed 's/^DUP: //')
+      f=${line#DUP: }
       echo "  - $(basename "$f")"
       DUPLICATES_FOUND=1
       ;;
@@ -105,11 +105,11 @@ awk '
 ' "$TMPDIR/titles.txt" | while IFS= read -r line; do
   case "$line" in
     SIMILAR:\ *)
-      f=$(echo "$line" | sed 's/^SIMILAR: //')
+      f=${line#SIMILAR: }
       echo "  - $(basename "$f")"
       ;;
     SIMILAR_PREV:\ *)
-      f=$(echo "$line" | sed 's/^SIMILAR_PREV: //')
+      f=${line#SIMILAR_PREV: }
       echo "  - $(basename "$f")"
       DUPLICATES_FOUND=1
       ;;
