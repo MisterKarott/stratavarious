@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
-  <img src="https://img.shields.io/badge/version-1.2.0-6c5ce7?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
 </p>
 
@@ -65,6 +65,9 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 │                   ▼                                      │
 │  ┌──────────────────────────────────────────┐            │
 │  │       /stratavarious consolidation       │            │
+│  │                                          │            │
+│  │  Phase 0 — Capture intentions            │            │
+│  │    Ask next steps before consolidating  │            │
 │  │                                          │            │
 │  │  Phase 1 — Read buffer                   │            │
 │  │    Load raw session capture              │            │
@@ -185,6 +188,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | Command | Description |
 |---|---|
 | `/stratavarious` | Run the full 8-phase consolidation pipeline — captures intentions, analyzes the conversation, writes handoff-quality summary to working memory, archives to vault, commits to git |
+| `/strata` | Alias de `/stratavarious` — même pipeline, nom plus court |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 
 ## Scripts
@@ -194,6 +198,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/setup.sh` | Initialize the vault directory structure with default templates |
 | `scripts/stratavarious-status.sh` | CLI status check — useful outside Claude Code |
 | `scripts/stratavarious-clean.sh` | Scan the vault for duplicate or stale entries and flag them for review |
+| `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed |
 
 ## What Gets Captured
 
@@ -222,6 +227,8 @@ No data ever leaves your machine. There is no telemetry, no analytics, no phone-
 | Variable | Default | Description |
 |---|---|---|
 | `STRATAVARIOUS_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
+| `STRATAVARIOUS_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
+| `STRATAVARIOUS_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
 
 Override by setting the environment variable before starting Claude Code.
 
