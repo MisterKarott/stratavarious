@@ -6,8 +6,6 @@ PLUGIN_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
 MEMORY_DIR="$STRATAVARIOUS_HOME/memory"
 VAULT_DIR="$MEMORY_DIR/vault"
-JOURNAL_DIR="$VAULT_DIR/journal"
-SESSIONS_DIR="$VAULT_DIR/sessions"
 TEMPLATE_DIR="$PLUGIN_ROOT/templates"
 LOCK_FILE="$STRATAVARIOUS_HOME/memory/.vault.lock"
 
@@ -26,8 +24,31 @@ acquire_lock
 echo "StrataVarious setup..."
 echo "Vault path: $STRATAVARIOUS_HOME"
 
-# 1. Create directory structure
-mkdir -p "$MEMORY_DIR" "$VAULT_DIR" "$JOURNAL_DIR" "$SESSIONS_DIR"
+# 1. Create per-project vault structure
+mkdir -p "$MEMORY_DIR" "$VAULT_DIR" "$VAULT_DIR/_global"
+for cat in decisions conventions patterns errors skills environments; do
+  mkdir -p "$VAULT_DIR/_global/$cat"
+done
+
+# Migrate existing flat vault to per-project structure (one-time)
+MIGRATION_MARKER="$VAULT_DIR/.v2-migrated"
+if [ ! -f "$MIGRATION_MARKER" ] && [ -d "$VAULT_DIR" ]; then
+  for f in "$VAULT_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    mv "$f" "$VAULT_DIR/_global/"
+    echo "Migrated $(basename "$f") to _global/"
+  done
+  if [ -d "$VAULT_DIR/journal" ]; then
+    mv "$VAULT_DIR/journal" "$VAULT_DIR/_global/journal"
+    echo "Migrated journal/ to _global/"
+  fi
+  if [ -d "$VAULT_DIR/sessions" ]; then
+    mv "$VAULT_DIR/sessions" "$VAULT_DIR/_global/sessions"
+    echo "Migrated sessions/ to _global/"
+  fi
+  touch "$MIGRATION_MARKER"
+  echo "Vault migrated to v2 per-project structure"
+fi
 
 # 2. Copy templates (only if not already existing)
 # MEMORY.md gets special merge treatment (see step 2b)
