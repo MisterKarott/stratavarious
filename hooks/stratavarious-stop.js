@@ -27,9 +27,9 @@ const SIMPLE_PATTERNS = [
   /\b(sk_live_[a-zA-Z0-9]{20,})\b/g,
   /\b(sk_test_[a-zA-Z0-9]{20,})\b/g,
   /\b(rk_(live|test)_[a-zA-Z0-9]{20,})\b/g,
-  // OpenAI / Anthropic
-  /\b(sk-[a-zA-Z0-9]{20,})\b/g,
-  /\b(sk-ant-[a-zA-Z0-9]{20,})\b/g,
+  // OpenAI / Anthropic (tirets inclus dans le corps de la clé, ex: sk-proj-XXX, sk-ant-api03-XXX)
+  /\b(sk-[a-zA-Z0-9-]{20,})/g,
+  /\b(sk-ant-[a-zA-Z0-9-]{20,})/g,
   // AWS
   /\b(AKIA[A-Z0-9]{16})\b/g,
   /\b(ASIA[A-Z0-9]{16})\b/g,
@@ -44,7 +44,7 @@ const SIMPLE_PATTERNS = [
 ];
 
 // Connection strings — handled separately to preserve user/host context
-const CONN_STRING_PATTERN = /\b(mongodb|postgres|mysql|redis|amqp)(\+[a-z]+)?:\/\/([^:]+):([^@]+)@/gi;
+const CONN_STRING_PATTERN = /\b(mongodb|postgres|mysql|redis|amqps?)(\+[a-z]+)?:\/\/([^:]+):([^@]+)@/gi;
 
 // HTTP basic auth dans une URL
 const HTTP_BASIC_PATTERN = /\b(https?:\/\/)([^:\/\s]+):([^@\s]+)@/gi;
@@ -128,8 +128,11 @@ function readLastNLines(filePath, n) {
     const readSize = Math.min(stat.size, 256 * 1024);
     const fd = fs.openSync(filePath, 'r');
     const buf = Buffer.alloc(readSize);
-    fs.readSync(fd, buf, 0, readSize, stat.size - readSize);
-    fs.closeSync(fd);
+    try {
+      fs.readSync(fd, buf, 0, readSize, stat.size - readSize);
+    } finally {
+      fs.closeSync(fd);
+    }
     const startedAtBeginning = (stat.size - readSize) === 0;
     const out = buf.toString('utf8').split('\n');
     if (!startedAtBeginning) out.shift(); // drop partial first line
