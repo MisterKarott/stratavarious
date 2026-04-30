@@ -4,30 +4,12 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
 
 const MAX_LINES = 200;
 const MAX_FILE_SIZE = 64 * 1024; // 64 KB max read to avoid loading huge STRATA.md files
 
 function getProjectRoot(cwd) {
-  // First, check if STRATA.md exists in current directory
-  const localStrata = path.join(cwd, 'STRATA.md');
-  if (fs.existsSync(localStrata)) {
-    return cwd;
-  }
-
-  // Otherwise, use git to find the repo root (but only if needed)
-  try {
-    const root = execSync('git rev-parse --show-toplevel', {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 2000, // Add timeout to avoid hanging
-    }).trim();
-    return root;
-  } catch {
-    return cwd;
-  }
+  return cwd;
 }
 
 function loadProfile() {

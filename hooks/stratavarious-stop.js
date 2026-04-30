@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, execFileSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 // Canonicalize STRATAVARIOUS_HOME: resolve to absolute path, strip NUL, reject relative.
 const _rawHome = process.env.STRATAVARIOUS_HOME || path.join(os.homedir(), '.claude', 'workspace', 'stratavarious');
@@ -148,31 +148,9 @@ function logHookError(err, context) {
   }
 }
 
-function getModifiedFiles(dir, hasFileModifications) {
-  // Skip git status if no file modifications detected in transcript
-  if (!hasFileModifications) return [];
-
-  try {
-    execSync('git rev-parse --is-inside-work-tree', { cwd: dir, stdio: 'ignore', timeout: 2000 });
-    // Use -z for NUL-delimited output (safer parsing, handles spaces/renames)
-    const output = execSync('git status --porcelain -z', { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8', timeout: 2000 }).trim();
-    if (!output) return [];
-    // Parse NUL-delimited output: each entry is "XY filename\0"
-    return output.split('\0')
-      .filter(s => s.length > 3)  // Skip empty entries
-      .map(entry => {
-        // git status -z format: "XY filename" where X=staging, Y=worktree
-        // For renames: "R  oldfile\0newfile\0" — we want the new filename
-        const status = entry.substring(0, 2);
-        let name = entry.substring(3);
-        // For rename status, the name comes after the second NUL in the next entry
-        // Simplified: just take whatever comes after the status prefix
-        return name;
-      })
-      .filter(f => f.length > 0);
-  } catch {
-    return [];
-  }
+function getModifiedFiles(_dir, _hasFileModifications) {
+  // File list derived from transcript tool calls only — no git dependency
+  return [];
 }
 
 // Read the last N lines of a file (bounded to 256 KiB to avoid reading huge transcripts)
@@ -378,12 +356,13 @@ function main() {
     }
   }
 
-  // Detect if file modifications occurred (Write/Edit/MultiEdit tools)
-  const hasFileModifications = transcriptInfo.toolCalls.some(t =>
-    t.name === 'write_file' || t.name === 'edit' || t.name === 'multi_edit' ||
-    t.name === 'Write' || t.name === 'Edit' || t.name === 'MultiEdit'
-  );
-  const modifiedFiles = getModifiedFiles(cwd, hasFileModifications);
+  // Derive modified files from transcript tool calls (no git dependency)
+  const FILE_TOOLS = new Set(['write_file', 'edit', 'multi_edit', 'Write', 'Edit', 'MultiEdit']);
+  const modifiedFiles = [...new Set(
+    transcriptInfo.toolCalls
+      .filter(t => FILE_TOOLS.has(t.name) && t.path)
+      .map(t => path.basename(t.path))
+  )];
   const project = getProjectName(cwd);
 
   // Build structured entry

@@ -108,19 +108,18 @@ Together, these layers mean Claude starts every session knowing what you did rec
 
 **Automatic capture.** The Stop hook runs transparently after each Claude response. It reads the session transcript to extract user intent, tool operations, file changes, and errors — then writes structured data to a buffer. No user action required.
 
-**Portable handoff file.** After each `/stratavarious`, a `STRATA.md` file is written to the root of the current git project. It contains a structured summary of the session: goal, decisions, files modified, what worked, dead ends, errors, and next steps. You can pass this file directly to a fresh session — no copy-pasting, no re-explaining.
+**Portable handoff file.** After each `/stratavarious`, a `STRATA.md` file is written to the root of the current project. It contains a structured summary of the session: goal, decisions, files modified, what worked, dead ends, errors, and next steps. You can pass this file directly to a fresh session — no copy-pasting, no re-explaining.
 
 **Auto-injection on session start.** A `SessionStart` hook detects `STRATA.md` at the current project root and automatically injects its content into the new session. The next session starts with the handoff already loaded.
 
 **Handoff replacement.** `/stratavarious` fully replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. Those feed directly into `STRATA.md` and `STRATAVARIOUS.md`. The next session loads both automatically.
 
-**Security scan.** Before anything enters the vault, a security scan strips credentials, API keys, tokens, and other sensitive values. Your secrets stay out of the knowledge base. The raw session buffer is also gitignored as an additional safety net.
+**Security scan.** Before anything enters the vault, a security scan strips credentials, API keys, tokens, and other sensitive values. Your secrets stay out of the knowledge base.
 
 ## Requirements
 
 - Claude Code (latest stable release)
 - Bash 3.2+ (macOS default works — all scripts are Bash 3.2 compatible)
-- Git (handoff detection is scoped to the current git project)
 - macOS, Linux, or Windows via WSL
 
 No Python, no Node, no external runtime. The plugin is pure shell + Markdown.
@@ -167,7 +166,7 @@ Next time you start Claude Code, your context is already there. Working memory l
     ├── STRATAVARIOUS.md        ← Working memory (last 3 sessions, auto-loaded)
     ├── MEMORY.md               ← Vault index (auto-loaded by Claude at session start)
     ├── profile.md              ← Developer preferences and work patterns (global)
-    ├── session-buffer.md       ← Raw capture from Stop hook (gitignored)
+    ├── session-buffer.md       ← Raw capture from Stop hook
     └── vault/
         ├── _global/            ← Cross-project knowledge
         │   ├── decisions/
@@ -278,7 +277,7 @@ Override by setting the environment variable before starting Claude Code.
 
 **`/stratavarious` says the buffer is empty.** The Stop hook only writes after a real session turn. Run a few prompts first, then consolidate.
 
-**`STRATA.md` wasn't injected in my new session.** Auto-injection requires being inside a git repository (handoff is scoped per project). Verify with `git rev-parse --show-toplevel`.
+**`STRATA.md` wasn't injected in my new session.** Auto-injection looks for `STRATA.md` in the working directory when Claude Code starts. Make sure you launch Claude Code from the project directory that contains the file.
 
 **I want to wipe everything and start over.** Delete `~/.claude/workspace/stratavarious/`. The next `/stratavarious` will reinitialize cleanly.
 

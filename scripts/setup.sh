@@ -92,30 +92,7 @@ if [ ! -f "$MEMORY_DIR/.gitignore" ]; then
   echo "Created .gitignore"
 fi
 
-# 4. Initialize Git in memory/
-if [ ! -d "$MEMORY_DIR/.git" ]; then
-  cd "$MEMORY_DIR"
-  # Try git init -b main (Git >= 2.28), fallback for older versions
-  if git init -b main 2>/dev/null; then
-    echo "Initialized git repository"
-  else
-    git init
-    git symbolic-ref HEAD refs/heads/main 2>/dev/null || \
-      git checkout -b main 2>/dev/null || \
-      echo "  (defaulted to master branch, manual rename to main recommended)"
-    echo "Initialized git repository"
-  fi
-  # Configure default user for auto-commits if not set globally
-  if ! git config --global user.email >/dev/null 2>&1; then
-    git config --local user.email "stratavarious@local"
-    git config --local user.name "StrataVarious"
-  fi
-  cd - >/dev/null
-else
-  echo "Git repository already exists"
-fi
-
-# 5. Check write permissions
+# 4. Check write permissions
 TEST_FILE="$MEMORY_DIR/.stratavarious_write_test"
 if touch "$TEST_FILE" && rm "$TEST_FILE"; then
   echo "Write permissions confirmed"

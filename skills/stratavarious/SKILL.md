@@ -127,7 +127,7 @@ Write a portable handoff file to the current project root. This file replaces `/
 **Step 1: Detect project root**
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PROJECT_ROOT=$(pwd)
 ```
 
 **Step 2: Write STRATA.md** — overwrite if it exists.
