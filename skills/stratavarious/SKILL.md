@@ -1,6 +1,6 @@
 ---
 name: stratavarious
-description: Persistent memory system for Claude Code — replaces /handoff. Use when the user invokes /stratavarious, mentions "save session", "consolidate memory", "close session", "end session", or wants to persist learnings from the current conversation. Also trigger when the user asks about memory status, vault contents, or session history. Produces a handoff-quality summary with next steps, then archives to the vault.
+description: Persistent memory system for Claude Code — replaces /handoff. Use when the user invokes /stratavarious, mentions "save session", "consolidate memory", "close session", "end session", or wants to persist learnings from the current conversation. Also trigger when the user asks about memory status, vault contents, or session history. Produces STRATA.md (portable handoff file) at the project root, then archives to the vault.
 user-invocable: true
 argument-hint: ""
 allowed-tools: ["Bash", "Read", "Write", "Edit", "AskUserQuestion"]
@@ -121,6 +121,58 @@ Apply the decision rules (see below) to identify what belongs in the vault. Scan
 - Patterns that suggest a skill candidate (see §When to suggest a skill)
 - New information not already in the vault
 - User corrections that change approach
+
+### Phase 3a — Write STRATA.md
+
+Write a portable handoff file to the current project root. This file replaces `/handoff` — it can be passed directly to a fresh session to continue the work.
+
+**Step 1: Detect project root**
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+```
+
+**Step 2: Write STRATA.md** — overwrite if it exists.
+
+Content template:
+
+```markdown
+# STRATA.md — [date] | [identifier]
+
+## Goal
+[Objective from Phase 2]
+
+## Current Progress
+[Actions list + Outcome from Phase 2]
+
+## Decisions
+- [decision 1 — reason]
+
+## Files modified
+[Files modified from Phase 2, comma-separated]
+
+## What Worked
+[What worked from Phase 2]
+
+## Dead Ends
+[Dead ends from Phase 2 — why they failed]
+
+## Errors
+[Errors → resolutions from Phase 2]
+
+## Next Steps
+[Next steps from Phase 0]
+```
+
+Sections with no content are omitted (e.g., if no dead ends, skip that section entirely).
+
+**Step 3: Confirm path to user**
+
+After writing, output: `STRATA.md written → [full path]`
+
+**Error handling:** If write fails, warn the user and continue to Phase 3. Never block on STRATA.md failure.
+
+> **Note:** STRATA.md is written to the current project root — not the StrataVarious vault. If the current project has its own git repo, STRATA.md will need to be committed there separately. The StrataVarious Phase 6 commit only covers the vault directory.
 
 ### Phase 3 — Write to STRATAVARIOUS.md
 

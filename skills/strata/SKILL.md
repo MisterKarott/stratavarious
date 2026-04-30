@@ -1,6 +1,6 @@
 ---
 name: strata
-description: Alias de /stratavarious — exécute la consolidation complète de session et le handoff. Utiliser quand l'utilisateur invoque /strata, "save session", "fin de session", "consolide", ou veut persister les apprentissages de la conversation.
+description: Alias de /stratavarious — exécute la consolidation complète de session, produit STRATA.md (handoff portable à la racine du projet) et archive dans le vault. Utiliser quand l'utilisateur invoque /strata, "save session", "fin de session", "consolide", ou veut persister les apprentissages de la conversation.
 user-invocable: true
 argument-hint: ""
 allowed-tools: ["Bash", "Read", "Write", "Edit", "AskUserQuestion"]
