@@ -7,37 +7,38 @@
 <h1 align="center">StrataVarious</h1>
 
 <p align="center"><strong>Persistent memory for Claude Code.</strong><br>
-Never start a session from zero again.</p>
+A local-first knowledge vault that keeps context between sessions, so you stop re-explaining your project every morning.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-active-success?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Made%20by-MisterKarott-ff6b6b?style=flat-square" alt="Author">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20WSL-lightgrey?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/data-100%25%20local-2d3436?style=flat-square" alt="Local-first">
+  <img src="https://img.shields.io/badge/telemetry-none-2d3436?style=flat-square" alt="No telemetry">
 </p>
 
 ---
 
-## The Problem
+## The problem
 
 Claude Code is powerful, but every session starts from scratch. You re-explain your stack, your naming conventions, the weird edge case you spent two hours debugging last Tuesday. You paste context into `CLAUDE.md` files and hope you remember to update them. Over time, you accumulate knowledge that lives only in past conversations — invisible to the next session.
 
 This isn't just inconvenient. It's **lost institutional memory**. Every session re-derives things you already figured out. Every handoff risks dropping critical context.
 
-**StrataVarious** fixes this by giving Claude Code a persistent, evolving memory that grows with every session — automatically.
+StrataVarious gives Claude Code a persistent, evolving memory that grows with every session — automatically, and entirely on your machine.
 
-## What StrataVarious Does
+## What it does
 
-StrataVarious is a Claude Code plugin that builds a **living knowledge vault** from your actual work sessions. It operates on a simple principle:
+StrataVarious is a Claude Code plugin that builds a structured knowledge base from your actual work sessions. It operates on a simple principle:
 
 > The most valuable knowledge about a project is produced naturally during development. You shouldn't have to manually write it down.
 
 Instead of asking you to maintain documentation, StrataVarious:
 
-1. **Observes** what happens in each session — decisions made, errors hit, patterns discovered, dead ends abandoned
-2. **Distills** raw session data into structured, reusable knowledge
-3. **Persists** that knowledge across sessions so Claude always has context
-4. **Protects** your secrets — credentials and API keys never enter the vault
+1. **Observes** what happens in each session — decisions made, errors hit, patterns discovered, dead ends abandoned.
+2. **Distills** raw session data into structured, reusable notes.
+3. **Persists** that knowledge across sessions so Claude always has context.
+4. **Protects** your secrets — credentials and API keys never enter the vault.
 
-The result is a self-maintaining knowledge base that gets smarter the more you work.
+The result is a self-maintaining knowledge base that compounds with use.
 
 ## Philosophy
 
@@ -45,17 +46,17 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 
 **Zero-friction by default.** The Stop hook captures data transparently. You don't need to remember to write things down or run a command before closing your session. The system works even if you forget it exists.
 
-**Selective memory, not hoarding.** StrataVarious doesn't dump entire conversation transcripts into files. The consolidation pipeline analyzes, filters, and structures raw session data into concise, actionable knowledge. A 2-hour debugging session might produce 5 lines of vault knowledge — the 5 lines that matter.
+**Selective memory, not hoarding.** StrataVarious doesn't dump entire conversation transcripts into files. The consolidation pipeline analyzes, filters, and structures raw session data into concise, actionable knowledge. A two-hour debugging session might produce five lines of vault knowledge — the five lines that matter.
 
 **Local-first, always.** All data stays on your machine. No cloud sync, no external API calls, no telemetry. Your vault is entirely under your control.
 
-## How It Works
+## How it works
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                     YOUR SESSIONS                        │
 │                                                          │
-│  Session 1 ──► Session 2 ──► Session 3 ──► ...          │
+│  Session 1 ──► Session 2 ──► Session 3 ──► ...           │
 │      │              │              │                     │
 │      ▼              ▼              ▼                     │
 │  ┌──────────────────────────────────────────┐            │
@@ -73,34 +74,18 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 │  │       /stratavarious consolidation       │            │
 │  │                                          │            │
 │  │  Phase 0 — Capture intentions            │            │
-│  │    Ask next steps before consolidating   │            │
-│  │                                          │            │
 │  │  Phase 1 — Read buffer                   │            │
-│  │    Load raw session capture              │            │
-│  │                                          │            │
 │  │  Phase 2 — Analyze session               │            │
-│  │    Identify decisions, errors, patterns  │            │
-│  │                                          │            │
-│  │  Phase 3a — Write STRATA.md  ◄── NEW     │            │
-│  │    Portable handoff at project root      │            │
-│  │                                          │            │
-│  │  Phase 3 — Write to working memory       │            │
-│  │    Update STRATAVARIOUS.md (last 3)      │            │
-│  │                                          │            │
+│  │  Phase 3a — Write STRATA.md              │            │
+│  │  Phase 3 — Update working memory         │            │
 │  │  Phase 4 — Security scan                 │            │
-│  │    Strip credentials and API keys        │            │
-│  │                                          │            │
 │  │  Phase 5 — Archive to vault              │            │
-│  │    Persist themed knowledge notes        │            │
-│  │                                          │            │
 │  │  Phase 6 — Cleanup buffer                │            │
-│  │    Clear raw session data                │            │
 │  └────────────────┬─────────────────────────┘            │
 │                   ▼                                      │
 │  ┌──────────────────────────────────────────┐            │
 │  │           KNOWLEDGE VAULT                │            │
 │  │         Persists across sessions         │            │
-│  │         Grows with every session         │            │
 │  └──────────────────────────────────────────┘            │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -109,45 +94,36 @@ The result is a self-maintaining knowledge base that gets smarter the more you w
 
 StrataVarious maintains two complementary layers:
 
-- **Working memory** (`STRATAVARIOUS.md`) — a rolling window of your last 3 sessions. Lightweight, always loaded, gives Claude immediate context about what you've been doing recently. Think of it as short-term memory.
+**Working memory** (`STRATAVARIOUS.md`) — a rolling window of your last three sessions. Lightweight, always loaded, gives Claude immediate context about what you've been doing recently. Think of it as short-term memory.
 
-- **Knowledge vault** (`vault/`) — durable, themed notes organized by category: decisions, error resolutions, patterns, preferences, dead ends. This is long-term memory. It grows over time and is indexed in `MEMORY.md`, which Claude auto-loads at session start.
+**Knowledge vault** (`vault/`) — durable, themed notes organized by category: decisions, error resolutions, patterns, preferences, dead ends. This is long-term memory. It grows over time and is indexed in `MEMORY.md`, which Claude auto-loads at session start.
 
 Together, these layers mean Claude starts every session knowing what you did recently *and* what you've learned over time.
 
 ## Features
 
-### Session Memory (Short-Term)
+**Session memory (short-term).** Your last three sessions are automatically summarized and loaded into context at session start. Claude knows what you worked on yesterday, what errors you hit, and where you left off — without you saying a word.
 
-Your last 3 sessions are automatically summarized and loaded into context at session start. Claude knows what you worked on yesterday, what errors you hit, and where you left off — without you saying a word.
+**Knowledge vault (long-term).** Durable notes organized by theme persist across all sessions. Over time, the vault accumulates your project's institutional knowledge: architectural decisions and why they were made, error patterns and their fixes, coding conventions, environment quirks. The kind of knowledge that normally lives only in the heads of experienced team members.
 
-### Knowledge Vault (Long-Term)
+**Automatic capture.** The Stop hook runs transparently after each Claude response. It reads the session transcript to extract user intent, tool operations, file changes, and errors — then writes structured data to a buffer. No user action required.
 
-Durable notes organized by theme persist across all sessions. Over time, the vault accumulates your project's institutional knowledge: architectural decisions and why they were made, error patterns and their fixes, coding conventions, environment quirks. This is the knowledge that normally lives only in the heads of experienced team members.
+**Portable handoff file.** After each `/stratavarious`, a `STRATA.md` file is written to the root of the current git project. It contains a structured summary of the session: goal, decisions, files modified, what worked, dead ends, errors, and next steps. You can pass this file directly to a fresh session — no copy-pasting, no re-explaining.
 
-### Automatic Capture
+**Auto-injection on session start.** A `SessionStart` hook detects `STRATA.md` at the current project root and automatically injects its content into the new session. The next session starts with the handoff already loaded.
 
-The Stop hook runs transparently after each Claude response. It reads the session transcript to extract user intent, tool operations, file changes, and errors — then writes structured data to a buffer. No user action required.
+**Handoff replacement.** `/stratavarious` fully replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. Those feed directly into `STRATA.md` and `STRATAVARIOUS.md`. The next session loads both automatically.
 
-### Portable Handoff File
+**Security scan.** Before anything enters the vault, a security scan strips credentials, API keys, tokens, and other sensitive values. Your secrets stay out of the knowledge base. The raw session buffer is also gitignored as an additional safety net.
 
-After each `/stratavarious`, a `STRATA.md` file is written to the root of the current git project. It contains a structured summary of the session: goal, decisions, files modified, what worked, dead ends, errors, and next steps. You can pass this file directly to a fresh session — no copy-pasting, no re-explaining.
+## Requirements
 
-### Auto-Injection on Session Start
+- Claude Code (latest stable release)
+- Bash 4+ (`scripts/` are POSIX-compatible shell)
+- Git (handoff detection is scoped to the current git project)
+- macOS, Linux, or Windows via WSL
 
-A `SessionStart` hook detects `STRATA.md` at the current project root and automatically injects its content into the new session's context. The next session starts with the handoff already loaded — you don't have to do anything.
-
-### Handoff Replacement
-
-`/stratavarious` fully replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. Those feed directly into `STRATA.md` and `STRATAVARIOUS.md`. Next session loads both automatically.
-
-### Consolidation Pipeline
-
-Running `/stratavarious` triggers a 7-phase pipeline: capture intentions → read conversation + buffer → analyze → write STRATA.md → write to working memory → security scan → archive to vault → cleanup.
-
-### Security Scan
-
-Before anything enters the vault, a security scan strips credentials, API keys, tokens, and other sensitive values. Your secrets stay out of the knowledge base. The raw session buffer is also gitignored as an additional safety net.
+No Python, no Node, no external runtime. The plugin is pure shell + Markdown.
 
 ## Installation
 
@@ -155,26 +131,29 @@ Before anything enters the vault, a security scan strips credentials, API keys, 
 claude plugin install github.com/MisterKarott/stratavarious
 ```
 
-## Quick Start
+That's it. The Stop and SessionStart hooks register automatically. The vault initializes itself on the first run of `/stratavarious`.
+
+### Verifying the installation
 
 ```bash
-# 1. Install the plugin
+/stratavarious-status
+```
+
+You should see vault status, entry count, and last consolidation date. If the vault hasn't been initialized yet, the command will tell you to run `/stratavarious` once.
+
+## Quick start
+
+```bash
+# 1. Install
 claude plugin install github.com/MisterKarott/stratavarious
-```
 
-```bash
-# 2. Initialize the vault — or skip this, /stratavarious auto-inits on first run
-bash ~/.claude/plugins/cache/*/stratavarious/*/scripts/setup.sh
-```
+# 2. Work normally — the Stop hook captures data in the background
 
-The Stop hook captures session data automatically. Work normally.
-
-```bash
-# 3. At end of session (or whenever you want), consolidate
+# 3. End of session (or whenever): consolidate
 /stratavarious
 ```
 
-Next time you start Claude Code, your context is already there. The working memory loads automatically. The vault index is available. You pick up where you left off.
+Next time you start Claude Code, your context is already there. Working memory loads automatically. The vault index is available. You pick up where you left off.
 
 ## Architecture
 
@@ -201,7 +180,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | Command | Description |
 |---|---|
 | `/stratavarious` | Run the full 7-phase consolidation pipeline — captures intentions, analyzes the conversation, writes `STRATA.md` to project root, updates working memory, archives to vault |
-| `/strata` | Alias for `/stratavarious` — same pipeline, shorter name |
+| `/strata` | Alias for `/stratavarious` |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 
 ## Scripts
@@ -211,20 +190,20 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/setup.sh` | Initialize the vault directory structure with default templates |
 | `scripts/stratavarious-status.sh` | CLI status check — useful outside Claude Code |
 | `scripts/stratavarious-clean.sh` | Scan the vault for duplicate or stale entries and flag them for review |
-| `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed |
+| `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed (CI-friendly) |
 
-## What Gets Captured
+## What gets captured
 
-StrataVarious is selective by design. Not everything that happens in a session is worth remembering. The consolidation pipeline looks for:
+StrataVarious is selective by design. Not everything in a session is worth remembering. The consolidation pipeline looks for:
 
-- **User preferences** — explicit ("I prefer arrow functions") and detected (you keep rejecting certain suggestions)
-- **Architectural decisions** — what was chosen and, critically, *why* — the rationale is often more valuable than the decision itself
-- **Errors and resolutions** — the bug, the root cause, and the fix. Next time you hit something similar, the answer is already there
-- **Successful patterns** — approaches that worked and are worth reusing
-- **Dead ends** — approaches that were abandoned, and why. This prevents re-exploring the same failed paths
-- **Project conventions** — naming patterns, file organization, environment quirks, tool configurations
+- **User preferences** — explicit ("I prefer arrow functions") and detected (you keep rejecting certain suggestions).
+- **Architectural decisions** — what was chosen and, critically, *why*. The rationale is often more valuable than the decision itself.
+- **Errors and resolutions** — the bug, the root cause, and the fix. Next time you hit something similar, the answer is already there.
+- **Successful patterns** — approaches that worked and are worth reusing.
+- **Dead ends** — approaches that were abandoned, and why. This prevents re-exploring the same failed paths.
+- **Project conventions** — naming patterns, file organization, environment quirks, tool configurations.
 
-## What Stays Private
+## What stays private
 
 | Concern | How it's handled |
 |---|---|
@@ -245,15 +224,40 @@ No data ever leaves your machine. There is no telemetry, no analytics, no phone-
 
 Override by setting the environment variable before starting Claude Code.
 
-## Use Cases
+## Use cases
 
-**Solo developers** — Stop re-explaining your project to Claude every morning. StrataVarious remembers your stack, your conventions, and the weird bugs you already solved.
+**Solo developers.** Stop re-explaining your project to Claude every morning. StrataVarious remembers your stack, your conventions, and the bugs you already solved.
 
-**Long-running projects** — After weeks of work, the vault accumulates deep project knowledge. Claude becomes more effective over time, not less.
+**Long-running projects.** After weeks of work, the vault accumulates deep project knowledge. Claude becomes more effective over time, not less.
 
-**Team context sharing** — The vault can be shared directly with teammates. Add it to your project and everyone gets the accumulated knowledge. New team members ramp up faster.
+**Team context sharing.** The vault is plain Markdown and can be committed (or partially committed) to a repo. New team members ramp up faster with shared institutional memory.
 
-**Debugging journals** — The error resolution entries form a searchable history of every bug you've encountered and how it was fixed. Like a personal Stack Overflow.
+**Debugging journals.** Error resolution entries form a searchable history of every bug you've encountered and how it was fixed. Like a personal Stack Overflow.
+
+## Troubleshooting
+
+**The Stop hook doesn't seem to fire.** Check that the plugin is enabled with `claude plugin list`. If you're in CI or a sandbox, `STRATAVARIOUS_DISABLE=1` may be set.
+
+**`/stratavarious` says the buffer is empty.** The Stop hook only writes after a real session turn. Run a few prompts first, then consolidate.
+
+**`STRATA.md` wasn't injected in my new session.** Auto-injection requires being inside a git repository (handoff is scoped per project). Verify with `git rev-parse --show-toplevel`.
+
+**I want to wipe everything and start over.** Delete `~/.claude/workspace/stratavarious/`. The next `/stratavarious` will reinitialize cleanly.
+
+**Something looks malformed in the vault.** Run `scripts/stratavarious-validate.sh`. It will exit non-zero and point to the offending file.
+
+## Uninstall
+
+```bash
+claude plugin uninstall stratavarious
+rm -rf ~/.claude/workspace/stratavarious   # optional: removes vault data
+```
+
+No leftover state, no system-level changes.
+
+## Contributing
+
+Issues and pull requests are welcome. For non-trivial changes, please open an issue first to discuss the direction. Run `scripts/stratavarious-validate.sh` before submitting a PR — CI uses the same check.
 
 ## License
 
