@@ -49,13 +49,10 @@ validate_file() {
   # Required fields — use sed instead of grep -oP (not portable on macOS)
   local date categorie tags
   date=$(echo "$fm" | sed -n 's/^date:[[:space:]]*\(.*\)$/\1/p')
+  # 'categorie' est le champ canonique ; 'category' accepté pour compat
   categorie=$(echo "$fm" | sed -n 's/^categorie:[[:space:]]*\(.*\)$/\1/p')
-  # Accept both 'categorie' (deprecated) and 'category' for backward compat
   if [ -z "$categorie" ]; then
     categorie=$(echo "$fm" | sed -n 's/^category:[[:space:]]*\(.*\)$/\1/p')
-  else
-    # Warn about deprecated 'categorie' field
-    echo "WARN $basename — using deprecated 'categorie' field, use 'category' instead"
   fi
   tags=$(echo "$fm" | sed -n 's/^tags:[[:space:]]*\(.*\)$/\1/p')
 

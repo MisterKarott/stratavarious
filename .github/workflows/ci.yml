@@ -35,6 +35,9 @@ jobs:
           node --check hooks/stratavarious-stop.js
           echo "Hook syntax OK"
 
+      - name: Unit tests
+        run: npm test
+
       - name: Hook dry test
         run: |
           mkdir -p /tmp/strata-test/memory
