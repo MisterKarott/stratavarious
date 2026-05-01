@@ -2,6 +2,7 @@
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
   <img src="https://img.shields.io/badge/version-2.0.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/github/actions/workflow/status/MisterKarott/stratavarious/CI.yml?branch=develop&label=CI&logo=githubactions&style=for-the-badge" alt="CI">
 </p>
 
 <h1 align="center">StrataVarious</h1>
@@ -94,7 +95,7 @@ The result is a self-maintaining knowledge base that compounds with use.
 
 StrataVarious maintains two complementary layers:
 
-**Working memory** (`STRATAVARIOUS.md`) — a rolling window of your last three sessions. Lightweight, always loaded, gives Claude immediate context about what you've been doing recently. Think of it as short-term memory.
+**Working memory** (`StrataVarious.md`) — a rolling window of your last three sessions. Lightweight, always loaded, gives Claude immediate context about what you've been doing recently. Think of it as short-term memory.
 
 **Knowledge vault** (`vault/`) — durable, themed notes organized by category: decisions, error resolutions, patterns, preferences, dead ends. This is long-term memory. It grows over time and is indexed in `MEMORY.md`, which Claude auto-loads at session start.
 
@@ -112,7 +113,7 @@ Together, these layers mean Claude starts every session knowing what you did rec
 
 **Auto-injection on session start.** A `SessionStart` hook detects `STRATA.md` at the current project root and automatically injects its content into the new session. The next session starts with the handoff already loaded.
 
-**Handoff replacement.** `/stratavarious` fully replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. Those feed directly into `STRATA.md` and `STRATAVARIOUS.md`. The next session loads both automatically.
+**Handoff replacement.** `/stratavarious` fully replaces `/handoff`. Before consolidating, it asks about your next steps and intentions. Those feed directly into `STRATA.md` and `StrataVarious.md`. The next session loads both automatically.
 
 **Security scan.** Before anything enters the vault, a security scan strips credentials, API keys, tokens, and other sensitive values. Your secrets stay out of the knowledge base.
 
@@ -163,7 +164,7 @@ Next time you start Claude Code, your context is already there. Working memory l
 
 ~/.claude/workspace/stratavarious/
 └── memory/
-    ├── STRATAVARIOUS.md        ← Working memory (last 3 sessions, auto-loaded)
+    ├── StrataVarious.md        ← Working memory (last 3 sessions, auto-loaded)
     ├── MEMORY.md               ← Vault index (auto-loaded by Claude at session start)
     ├── profile.md              ← Developer preferences and work patterns (global)
     ├── session-buffer.md       ← Raw capture from Stop hook
@@ -255,9 +256,9 @@ StrataVarious reduces the risk of secrets entering the vault, but does not elimi
 
 | Variable | Default | Description |
 |---|---|---|
-| `STRATAVARIOUS_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
-| `STRATAVARIOUS_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
-| `STRATAVARIOUS_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
+| `StrataVarious_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
+| `StrataVarious_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
+| `StrataVarious_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
 
 Override by setting the environment variable before starting Claude Code.
 
@@ -273,7 +274,7 @@ Override by setting the environment variable before starting Claude Code.
 
 ## Troubleshooting
 
-**The Stop hook doesn't seem to fire.** Check that the plugin is enabled with `claude plugin list`. If you're in CI or a sandbox, `STRATAVARIOUS_DISABLE=1` may be set.
+**The Stop hook doesn't seem to fire.** Check that the plugin is enabled with `claude plugin list`. If you're in CI or a sandbox, `StrataVarious_DISABLE=1` may be set.
 
 **`/stratavarious` says the buffer is empty.** The Stop hook only writes after a real session turn. Run a few prompts first, then consolidate.
 
