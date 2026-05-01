@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "stratavarious",
+  "version": "2.0.0",
+  "description": "Persistent memory system for Claude Code — session consolidation, vault, and cross-session knowledge",
+  "owner": {
+    "name": "MisterKarott"
+  },
+  "plugins": [
+    {
+      "name": "stratavarious",
+      "source": "./",
+      "category": "development",
+      "description": "Persistent memory system for Claude Code — session consolidation, vault, and cross-session knowledge"
+    }
+  ]
+}
