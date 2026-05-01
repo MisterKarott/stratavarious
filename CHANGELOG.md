@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - marketplace.json enabling plugin installation via `claude plugin install github.com/MisterKarott/stratavarious`
 
+### Fixed
+- hooks/hooks.json structure: wrap hooks definition under top-level `hooks` key as required by Claude Code plugin runtime. Without this wrapper, plugin installation succeeds but hooks fail to load with a Zod validation error (expected: record, received: undefined).
+
 ## [2.0.0] - 2025-01-XX
 
 ### Added
