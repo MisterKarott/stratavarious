@@ -6,8 +6,8 @@
 
 set -euo pipefail
 
-STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
-VAULT_DIR="${1:-$STRATAVARIOUS_HOME/memory/vault}"
+StrataVarious_HOME="${StrataVarious_HOME:-$HOME/.claude/workspace/stratavarious}"
+VAULT_DIR="${1:-$StrataVarious_HOME/memory/vault}"
 
 if [ ! -d "$VAULT_DIR" ]; then
   echo "Vault directory not found: $VAULT_DIR"
@@ -23,6 +23,7 @@ validate_file() {
   basename=$(basename "$file")
 
   local result
+  # shellcheck disable=SC1078,SC1079,SC2140,SC2288
   result=$(awk '
   BEGIN { found_opening = 0; found_closing = 0; line_count = 0; fm_lines = "" }
   {
@@ -147,11 +148,10 @@ validate_file() {
       ;;
   esac
 
-  local date categorie tags projet
+  local date categorie tags
   date=$(echo "$result" | cut -d'|' -f1)
   categorie=$(echo "$result" | cut -d'|' -f2)
   tags=$(echo "$result" | cut -d'|' -f3)
-  projet=$(echo "$result" | cut -d'|' -f4)
 
   if [ -z "$date" ]; then
     echo "FAIL $basename — missing date"

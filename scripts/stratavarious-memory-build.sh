@@ -7,9 +7,9 @@
 
 set -euo pipefail
 
-STRATAVARIOUS_HOME="${STRATAVARIOUS_HOME:-$HOME/.claude/workspace/stratavarious}"
-VAULT_DIR="$STRATAVARIOUS_HOME/memory/vault"
-MEMORY_FILE="$STRATAVARIOUS_HOME/memory/MEMORY.md"
+StrataVarious_HOME="${StrataVarious_HOME:-$HOME/.claude/workspace/stratavarious}"
+VAULT_DIR="$StrataVarious_HOME/memory/vault"
+MEMORY_FILE="$StrataVarious_HOME/memory/MEMORY.md"
 PROJECT_FILTER="${1:-}"
 MAX_LINES=200
 
@@ -22,6 +22,7 @@ CATEGORIES="decisions conventions errors patterns skills preferences environment
 
 # Extract frontmatter fields from a vault note
 # Output: date|categorie|tags|projet|title
+# Note: tags field is extracted but not currently used in memory build
 extract_frontmatter() {
   local file="$1"
   awk '
@@ -43,20 +44,12 @@ extract_frontmatter() {
     }
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", date)
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", categorie)
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", tags)
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", projet)
-    # Extract first heading as title
   }
+ print date "|" categorie "|" tags "|" projet
   ' "$file"
 
-  # Extract title separately (first # heading after frontmatter)
-  local title
-  title=$(awk '
-    /^---$/ { if (started) { in_fm = !in_fm; next } else { in_fm = 1; started = 1; next } }
-    in_fm { next }
-    /^# / { sub(/^# /, ""); print; exit }
-  ' "$file" 2>/dev/null)
-
-  echo "$date|$categorie|$tags|$projet|$title"
 }
 
 # Collect all vault entries (excluding journal/ and sessions/)
@@ -73,7 +66,12 @@ find "$VAULT_DIR" -type f -name "*.md" -print0 2>/dev/null | while IFS= read -r 
   date=$(echo "$fm" | cut -d'|' -f1)
   categorie=$(echo "$fm" | cut -d'|' -f2)
   projet=$(echo "$fm" | cut -d'|' -f4)
-  title=$(echo "$fm" | cut -d'|' -f5)
+  # Extract title separately (first # heading after frontmatter)
+  title=$(awk '
+    /^---$/ { if (started) { in_fm = !in_fm; next } else { in_fm = 1; started = 1; next } }
+    in_fm { next }
+    /^# / { sub(/^# /, ""); print; exit }
+  ' "$file" 2>/dev/null)
   basename=$(basename "$file")
 
   # Skip if no date or categorie
