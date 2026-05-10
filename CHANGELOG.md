@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `scripts/stratavarious-search.sh` — full-text vault search with frontmatter filters and recency-based ranking. Score = `match_count × exp(-age_days/30)`. Filters: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`. Flags: `--json` (machine output), `--limit=N` (default 10). Uses ripgrep with grep -r fallback.
+- `/strata-search` skill — Claude Code skill that invokes the search script.
 - marketplace.json enabling plugin installation via `claude plugin install github.com/MisterKarott/stratavarious`
 - `scripts/stratavarious-doctor.sh` — vault integrity audit script. Detects: broken MEMORY.md links, orphan notes (in vault but not indexed), dates in future or before 2020, tags not in `#lowercase` format, duplicate titles in the same MEMORY.md section, and frontmatter errors (via validate.sh). Flags: `--json` (machine output), `--fix` (interactive repair for orphans and tag normalization), `--yes` (skip confirmations). Exit codes: 0=healthy, 1=warnings only, 2=errors found.
 - `/strata-doctor` skill — Claude Code skill that invokes the doctor script.
