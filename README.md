@@ -195,6 +195,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `/strata-pause` | Toggle session capture on/off — pause for exploratory sessions, resume when ready |
 | `/strata-doctor` | Audit vault integrity — broken MEMORY.md links, orphan notes, date issues, malformed tags, duplicate titles |
 | `/strata-search <query>` | Search vault notes by content and frontmatter — ranked results with recency scoring. Filters: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`. Flags: `--json`, `--limit=N` |
+| `/strata-prune` | Vault hygiene — detect decay, trivial, and duplicate notes. Flags: `--apply`, `--yes`, `--age-days N`, `--json` |
 
 ## Scripts
 
@@ -206,6 +207,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed (CI-friendly) |
 | `scripts/stratavarious-doctor.sh` | Audit vault integrity: broken MEMORY.md links, orphans, dates, tags, duplicates. Flags: `--json`, `--fix`, `--yes`. Exit 0=healthy, 1=warnings, 2=errors |
 | `scripts/stratavarious-search.sh` | Full-text vault search with frontmatter filters and recency-based ranking. Flags: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`, `--json`, `--limit=N` |
+| `scripts/stratavarious-prune.sh` | Vault hygiene: detect decay (old unreferenced error notes), trivial notes (<5 lines), and semantic duplicates (Levenshtein/Jaccard title similarity). Dry-run by default. Flags: `--apply`, `--yes`, `--age-days N`, `--json` |
 | `scripts/stratavarious-write.sh` | File-locked append wrapper — ensures safe concurrent vault writes |
 | `scripts/demo-recording.sh` | Record an Asciinema demo of the StrataVarious workflow |
 
@@ -237,6 +239,39 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 ```
 /strata-search api key --json
 ```
+
+## Vault hygiene
+
+Over time, vaults accumulate stale, redundant, or trivial notes. Three tools keep it clean:
+
+| Tool | Purpose |
+|------|---------|
+| `/strata-doctor` | Audit structural integrity — broken links, orphans, malformed frontmatter |
+| `/strata-prune` | Detect and remove decay, trivial, and duplicate notes |
+| `/stratavarious-status` | Overview of vault size and recent activity |
+
+**Recommended hygiene workflow:**
+
+```
+# 1. Audit integrity first
+/strata-doctor
+
+# 2. Review pruning candidates (dry-run)
+/strata-prune
+
+# 3. Apply pruning
+/strata-prune --apply
+
+# 4. Fix any orphan references left by pruning
+/strata-doctor --fix
+```
+
+**Prune candidate types:**
+- **Decay** — error notes older than 60 days not referenced by any other note → archived to `vault/_archive/<year>/`
+- **Trivial** — notes with fewer than 5 content lines → deleted
+- **Semantic duplicates** — notes with near-identical titles in the same category (Levenshtein distance < 3 or Jaccard similarity > 70%) → flagged for manual merge
+
+Customize the decay threshold via the `StrataVarious_PRUNE_AGE_DAYS` environment variable.
 
 ## What gets captured
 
