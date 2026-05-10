@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - marketplace.json enabling plugin installation via `claude plugin install github.com/MisterKarott/stratavarious`
 - `scripts/stratavarious-doctor.sh` — vault integrity audit script. Detects: broken MEMORY.md links, orphan notes (in vault but not indexed), dates in future or before 2020, tags not in `#lowercase` format, duplicate titles in the same MEMORY.md section, and frontmatter errors (via validate.sh). Flags: `--json` (machine output), `--fix` (interactive repair for orphans and tag normalization), `--yes` (skip confirmations). Exit codes: 0=healthy, 1=warnings only, 2=errors found.
 - `/strata-doctor` skill — Claude Code skill that invokes the doctor script.
+- `docs/performance.md` — performance reference doc with P50/P95/max baselines, thresholds, and methodology.
+- `package.json`: `"os": ["darwin", "linux"]` field.
+- Bench `scrubSecrets (256KB realistic)` — 256 KiB buffer with ~20 evenly distributed secrets (production-realistic density). P95 threshold: 20 ms.
+- Bench `extractFromTranscript (1000 entries)` — 1000-entry JSONL transcript (~256 KiB), 100 iterations. P95 threshold: 500 ms.
+- All benchmarks now report P50/P95/max instead of average only.
+- CI: `perf-check` job (`workflow_dispatch` only, non-blocking) runs `node tests/bench.mjs` on ubuntu-latest.
 
 ### Fixed
 - hooks/hooks.json structure: wrap hooks definition under top-level `hooks` key as required by Claude Code plugin runtime. Without this wrapper, plugin installation succeeds but hooks fail to load with a Zod validation error (expected: record, received: undefined).
