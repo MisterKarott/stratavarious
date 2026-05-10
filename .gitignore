@@ -6,3 +6,6 @@ node_modules/
 memory/session-buffer.md
 memory/.hook-errors.log
 /.work/
+CLAUDE.md
+HANDOFF.md
+MEMORY.md
