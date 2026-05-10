@@ -31,17 +31,55 @@ const SIMPLE_PATTERNS = [
   /\b(sk|rk)_(live|test)_[a-zA-Z0-9]{20,}\b/g,
   // AWS
   /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g,
-  // GitHub
+  // GitHub classic PAT
   /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g,
+  // GitHub fine-grained PAT — https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   // Slack
   /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g,
-  // Google API
+  // Google API key
   /\bAIza[0-9A-Za-z_-]{35}\b/g,
+  // Google OAuth access token — https://developers.google.com/identity/protocols/oauth2
+  /\bya29\.[A-Za-z0-9_-]{20,}\b/g,
   // JWT — bounded to avoid catastrophic backtracking
   /\beyJ[A-Za-z0-9_=-]{1,2048}\.[A-Za-z0-9_=-]{1,2048}\.[A-Za-z0-9_.+/=-]{1,2048}\b/g,
-  // OpenAI sk- pattern with word boundary to avoid mid-word matches
+  // OpenAI / Anthropic sk- prefix — https://docs.anthropic.com/en/api/getting-started
+  /\b(sk-ant-[a-zA-Z0-9_-]{20,})(?=\s|$|[^\w-])/g,
   /\b(sk-[a-zA-Z0-9-]{20,})(?=\s|$|[^\w-])/g,
 ];
+
+// Strict-mode labeled patterns: same as LABELED_PATTERNS but anchors relaxed to match mid-line.
+// Opt-in via STRATAVARIOUS_STRICT_SCRUB=1. Higher false-positive rate.
+// Risk: "I use api_key=none as placeholder" gets redacted. Prefer default mode in shared vaults.
+const STRICT_LABELED_PATTERNS = [
+  { re: /\b([Aa]uthorization\s*:\s*[Bb]earer\s+)(\S+)/g },
+  { re: /\b([Aa]uthorization\s*:\s*[Bb]asic\s+)(\S+)/g },
+  { re: /\b(x-api-key\s*:\s*)(\S+)/gi },
+  // Mid-line match: drops ^ anchor, matches password/secret/etc. anywhere in line
+  { re: /(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*=\s*)['"]?([^\s'"]{8,})['"]?/gim },
+  { re: /\s*(password|passwd|pwd|secret|api_key|apikey|access_key|private_key|auth_token|refresh_token)(\s*:\s*)['"]?([^\s'"]{8,})['"]?/gim },
+];
+
+// Shannon entropy: H = -sum(p * log2(p)) over unique chars
+// Used for entropy scan (opt-in via STRATAVARIOUS_ENTROPY_SCAN=1).
+function shannonEntropy(str) {
+  const freq = {};
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    freq[c] = (freq[c] || 0) + 1;
+  }
+  let h = 0;
+  const len = str.length;
+  const keys = Object.keys(freq);
+  for (let i = 0; i < keys.length; i++) {
+    const p = freq[keys[i]] / len;
+    h -= p * Math.log2(p);
+  }
+  return h;
+}
+
+// Regex for high-entropy candidate strings: only chars common in tokens/keys
+const HIGH_ENTROPY_RE = /[a-zA-Z0-9+/=_-]{20,}/g;
 
 // Connection strings — handled separately to preserve user/host context
 const CONN_STRING_PATTERN = /\b(mongodb|postgres|mysql|redis|amqps?)(\+[a-z]+)?:\/\/([^:]+):([^@]+)@/gi;
@@ -49,7 +87,12 @@ const CONN_STRING_PATTERN = /\b(mongodb|postgres|mysql|redis|amqps?)(\+[a-z]+)?:
 // HTTP basic auth dans une URL
 const HTTP_BASIC_PATTERN = /\b(https?:\/\/)([^:\/\s]+):([^@\s]+)@/gi;
 
-function scrubSecrets(text) {
+function scrubSecrets(text, opts) {
+  const strictMode = (opts && opts.strict) || process.env.STRATAVARIOUS_STRICT_SCRUB === '1';
+  const entropyMode = (opts && opts.entropy) || process.env.STRATAVARIOUS_ENTROPY_SCAN === '1';
+  const _rawThreshold = parseFloat(process.env.STRATAVARIOUS_ENTROPY_THRESHOLD || '');
+  const entropyThreshold = (isFinite(_rawThreshold) && _rawThreshold > 0) ? _rawThreshold : 4.5;
+
   let cleaned = text;
 
   // Connection strings: redact only the password portion
@@ -63,15 +106,13 @@ function scrubSecrets(text) {
   });
 
   // Labeled patterns: keep the label prefix, redact the secret
-  for (const { re } of LABELED_PATTERNS) {
+  const activeLabeled = strictMode ? STRICT_LABELED_PATTERNS : LABELED_PATTERNS;
+  for (const { re } of activeLabeled) {
     cleaned = cleaned.replace(re, (match, ...args) => {
       // args[0] = label/prefix, args[1] = separator (for 3-group), args[2] = value (for 3-group)
-      // Check if we have a 3rd capture group that is a string (key=value pattern)
       if (typeof args[2] === 'string') {
-        // 3-group pattern (key=value)
         return args[0] + args[1] + '[REDACTED]';
       }
-      // 2-group pattern (Bearer / X-API-Key)
       if (typeof args[0] === 'string') {
         return args[0] + '[REDACTED]';
       }
@@ -83,6 +124,17 @@ function scrubSecrets(text) {
   for (const pattern of SIMPLE_PATTERNS) {
     cleaned = cleaned.replace(pattern, (match) => match.substring(0, 4) + '...' + '[REDACTED]');
   }
+
+  // Entropy scan (opt-in): redact high-entropy strings that look like tokens
+  if (entropyMode) {
+    cleaned = cleaned.replace(HIGH_ENTROPY_RE, (match) => {
+      if (shannonEntropy(match) > entropyThreshold) {
+        return match.substring(0, 4) + '...' + '[REDACTED-ENTROPY]';
+      }
+      return match;
+    });
+  }
+
   return cleaned;
 }
 
@@ -464,4 +516,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { scrubSecrets, stripInvisibleUnicode, extractFromTranscript };
+module.exports = { scrubSecrets, stripInvisibleUnicode, extractFromTranscript, shannonEntropy };
