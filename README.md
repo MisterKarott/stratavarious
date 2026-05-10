@@ -194,6 +194,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 | `/strata-pause` | Toggle session capture on/off — pause for exploratory sessions, resume when ready |
 | `/strata-doctor` | Audit vault integrity — broken MEMORY.md links, orphan notes, date issues, malformed tags, duplicate titles |
+| `/strata-search <query>` | Search vault notes by content and frontmatter — ranked results with recency scoring. Filters: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`. Flags: `--json`, `--limit=N` |
 
 ## Scripts
 
@@ -204,8 +205,38 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/stratavarious-clean.sh` | Scan the vault for duplicate or stale entries and flag them for review |
 | `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed (CI-friendly) |
 | `scripts/stratavarious-doctor.sh` | Audit vault integrity: broken MEMORY.md links, orphans, dates, tags, duplicates. Flags: `--json`, `--fix`, `--yes`. Exit 0=healthy, 1=warnings, 2=errors |
+| `scripts/stratavarious-search.sh` | Full-text vault search with frontmatter filters and recency-based ranking. Flags: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`, `--json`, `--limit=N` |
 | `scripts/stratavarious-write.sh` | File-locked append wrapper — ensures safe concurrent vault writes |
 | `scripts/demo-recording.sh` | Record an Asciinema demo of the StrataVarious workflow |
+
+## Searching the vault
+
+`/strata-search` lets you query all vault notes by full text and frontmatter. Results are ranked by `match_count × exp(-age_days / 30)` — recent matches rank higher than old ones.
+
+**Basic search**
+```
+/strata-search rate limiting
+```
+
+**Filter by category and date range**
+```
+/strata-search auth --category=decisions --since=30d
+```
+
+**Find notes by tag, limited to your project**
+```
+/strata-search docker --tag=infra --project=nemty --limit=5
+```
+
+**Search global knowledge only (no project-specific notes)**
+```
+/strata-search retry --global
+```
+
+**Machine-readable JSON output**
+```
+/strata-search api key --json
+```
 
 ## What gets captured
 
