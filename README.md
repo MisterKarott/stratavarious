@@ -299,12 +299,24 @@ No data ever leaves your machine. There is no telemetry, no analytics, no phone-
 
 StrataVarious includes a built-in secret scanner that runs before any data enters the vault. It detects and redacts:
 
-- API keys (Stripe, OpenAI, Anthropic, AWS, GitHub, Slack, Google)
-- Bearer and Basic authentication headers
-- Database connection strings (MongoDB, PostgreSQL, MySQL, Redis)
-- Passwords in key-value assignments (`password=...`, `api_key: ...`)
-- JWT tokens
-- HTTP basic auth in URLs
+| Pattern | Examples |
+|---|---|
+| Stripe keys | `sk_live_...`, `rk_test_...` |
+| AWS credentials | `AKIA...`, `ASIA...` |
+| GitHub tokens | `ghp_...`, `gho_...`, `github_pat_...` (fine-grained PATs) |
+| Google | API keys (`AIza...`), OAuth access tokens (`ya29....`) |
+| Anthropic keys | `sk-ant-...` |
+| OpenAI keys | `sk-...` |
+| Slack tokens | `xoxb-...`, `xoxa-...`, etc. |
+| JWT tokens | `eyJ...` |
+| HTTP Authorization | Bearer and Basic headers |
+| Database connections | MongoDB, PostgreSQL, MySQL, Redis connection strings |
+| HTTP basic auth | Credentials embedded in URLs |
+| Key-value assignments | `password=...`, `api_key: ...`, `secret=...` (at line start or in YAML) |
+
+**Optional: strict mode.** Set `STRATAVARIOUS_STRICT_SCRUB=1` to also match `password=`, `api_key=`, `secret=`, etc. when they appear mid-line (not just at line start). Higher false-positive rate — phrases like `api_key=none` will be redacted. Disabled by default.
+
+**Optional: entropy scan.** Set `STRATAVARIOUS_ENTROPY_SCAN=1` to detect any string ≥20 characters of token-like characters (`[a-zA-Z0-9+/=_-]`) with Shannon entropy > 4.5 bits/char. Catches unknown token formats at the cost of occasional false positives on long identifiers. Threshold configurable via `STRATAVARIOUS_ENTROPY_THRESHOLD` (default: `4.5`). Disabled by default.
 
 **Important limitations:** The scanner uses pattern matching (regex). It cannot guarantee detection of all possible secret formats, especially:
 - Custom or proprietary key formats
@@ -324,9 +336,12 @@ StrataVarious reduces the risk of secrets entering the vault, but does not elimi
 
 | Variable | Default | Description |
 |---|---|---|
-| `StrataVarious_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
-| `StrataVarious_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
-| `StrataVarious_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
+| `STRATAVARIOUS_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
+| `STRATAVARIOUS_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
+| `STRATAVARIOUS_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
+| `STRATAVARIOUS_STRICT_SCRUB` | *(unset)* | Set to `1` to enable strict mode (mid-line key-value matching) |
+| `STRATAVARIOUS_ENTROPY_SCAN` | *(unset)* | Set to `1` to enable Shannon entropy scan for unknown tokens |
+| `STRATAVARIOUS_ENTROPY_THRESHOLD` | `4.5` | Entropy threshold (bits/char) for entropy scan |
 
 Override by setting the environment variable before starting Claude Code.
 

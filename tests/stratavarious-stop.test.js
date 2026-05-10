@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
-const { scrubSecrets, stripInvisibleUnicode, extractFromTranscript } = require('../hooks/stratavarious-stop.js');
+const { scrubSecrets, stripInvisibleUnicode, extractFromTranscript, shannonEntropy } = require('../hooks/stratavarious-stop.js');
 
 describe('scrubSecrets', () => {
   test('mongodb password redacted', () => {
@@ -156,6 +156,112 @@ describe('extractFromTranscript', () => {
     ];
     const result = extractFromTranscript(lines);
     assert.strictEqual(result.userMessages.length, 1);
+  });
+});
+
+// --- Chantier C: nouveaux patterns ---
+
+describe('scrubSecrets: Anthropic sk-ant-', () => {
+  test('redacts Anthropic API key (positive)', () => {
+    const key = 'sk-ant-api03-aBcDeFgHiJkLmNoPqRsTuVwXyZ01234567890abcdef';
+    const result = scrubSecrets(`token=${key}`);
+    assert.ok(!result.includes(key), `Expected key to be redacted, got: ${result}`);
+  });
+
+  test('preserves short sk-ant- that is not a real key (negative)', () => {
+    // Only 5 chars after prefix — below 20 char threshold
+    const txt = 'sk-ant-short';
+    assert.strictEqual(scrubSecrets(txt), txt);
+  });
+});
+
+describe('scrubSecrets: GitHub fine-grained PAT', () => {
+  test('redacts github_pat_ token (positive)', () => {
+    const pat = 'github_pat_11AAAAAAAA0XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
+    const result = scrubSecrets(`my token: ${pat}`);
+    assert.ok(!result.includes(pat), `Expected PAT to be redacted, got: ${result}`);
+    assert.ok(result.includes('[REDACTED]'), `Expected [REDACTED] in result`);
+  });
+
+  test('does not redact github_pat_ with short suffix (negative)', () => {
+    const txt = 'github_pat_short';
+    assert.strictEqual(scrubSecrets(txt), txt);
+  });
+});
+
+describe('scrubSecrets: Google OAuth ya29.', () => {
+  test('redacts Google OAuth access token (positive)', () => {
+    const token = 'ya29.A0AfH6SMABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const result = scrubSecrets(`Authorization: Bearer ${token}`);
+    assert.ok(!result.includes(token), `Expected OAuth token to be redacted, got: ${result}`);
+  });
+
+  test('does not redact ya29. with short suffix (negative)', () => {
+    const txt = 'ya29.short';
+    assert.strictEqual(scrubSecrets(txt), txt);
+  });
+});
+
+describe('scrubSecrets: strict mode', () => {
+  test('strict mode redacts mid-line api_key= (positive)', () => {
+    const txt = 'config: api_key=MySecretKey123456';
+    const result = scrubSecrets(txt, { strict: true });
+    assert.ok(!result.includes('MySecretKey123456'), `Expected key redacted, got: ${result}`);
+  });
+
+  test('default mode does NOT redact mid-line api_key= (negative)', () => {
+    // Default (non-strict) requires line start — mid-line should NOT be redacted
+    const txt = 'inline config: api_key=MySecretKey123456';
+    const result = scrubSecrets(txt);
+    assert.strictEqual(result, txt, `Default mode should not redact mid-line match`);
+  });
+});
+
+describe('shannonEntropy', () => {
+  test('high-entropy string (base64-like key)', () => {
+    // Random-looking key: entropy should be > 4.5
+    const key = 'aB3kLmN9pQrSt7uVwXyZ012345';
+    const h = shannonEntropy(key);
+    assert.ok(h > 4.0, `Expected entropy > 4.0, got ${h}`);
+  });
+
+  test('low-entropy string (repetitive)', () => {
+    // Repetitive string: entropy should be low
+    const h = shannonEntropy('aaaaaaaaaaaaaaaaaaaaaa');
+    assert.strictEqual(h, 0, `Expected entropy 0 for all-same string, got ${h}`);
+  });
+
+  test('empty string returns 0', () => {
+    assert.strictEqual(shannonEntropy(''), 0);
+  });
+});
+
+describe('scrubSecrets: entropy scan', () => {
+  test('entropy mode redacts high-entropy long string (positive)', () => {
+    // Realistic high-entropy token (>20 chars, entropy >4.5)
+    const token = 'xK9mP2qR5sT8vW1yA4bC7dE0fG3hI6jL';
+    const result = scrubSecrets(token, { entropy: true });
+    assert.ok(result.includes('[REDACTED-ENTROPY]'), `Expected entropy redaction, got: ${result}`);
+  });
+
+  test('entropy mode does not redact short string (negative)', () => {
+    // Short — below 20 char threshold
+    const txt = 'shorttoken123';
+    const result = scrubSecrets(txt, { entropy: true });
+    assert.strictEqual(result, txt);
+  });
+
+  test('entropy mode does not redact low-entropy repeated pattern (negative)', () => {
+    // Repetitive: aaaaaaaaaaaaaaaaaaaaa — entropy ~= 0
+    const txt = 'aaaaaaaaaaaaaaaaaaaaa';
+    const result = scrubSecrets(txt, { entropy: true });
+    assert.strictEqual(result, txt);
+  });
+
+  test('entropy mode off by default (negative)', () => {
+    const token = 'xK9mP2qR5sT8vW1yA4bC7dE0fG3hI6jL';
+    const result = scrubSecrets(token);
+    assert.ok(!result.includes('[REDACTED-ENTROPY]'), 'Entropy mode should be off by default');
   });
 });
 

@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/README.md` — Documentation index (updated to include performance.md)
 - `templates/vault.gitignore` — Ready-to-copy gitignore for vault git sync setup
 - README.md: Documentation section pointing to `docs/`, troubleshooting entry for vault divergence across machines
+- Secret scrubber: new patterns for GitHub fine-grained PATs (`github_pat_...`), Google OAuth access tokens (`ya29....`), and Anthropic API keys (`sk-ant-...`)
+- Strict mode (`STRATAVARIOUS_STRICT_SCRUB=1`): opt-in mid-line matching for `password=`, `api_key=`, `secret=`, etc.
+- Entropy scan (`STRATAVARIOUS_ENTROPY_SCAN=1`): opt-in Shannon entropy detection for unknown token formats (threshold configurable via `STRATAVARIOUS_ENTROPY_THRESHOLD`, default 4.5 bits/char)
+- 15 new unit tests covering all new patterns (positive and negative cases), entropy calculation, and strict mode
+
+### Security
+- Extended coverage for Anthropic, GitHub fine-grained PAT, and Google OAuth token formats
 
 ### Fixed
 - hooks/hooks.json structure: wrap hooks definition under top-level `hooks` key as required by Claude Code plugin runtime. Without this wrapper, plugin installation succeeds but hooks fail to load with a Zod validation error (expected: record, received: undefined).
