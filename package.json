@@ -1,6 +1,6 @@
 {
   "name": "stratavarious",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Persistent memory system for Claude Code — session consolidation, vault, and cross-session knowledge",
   "engines": {
     "node": ">=18"
