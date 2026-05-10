@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - marketplace.json enabling plugin installation via `claude plugin install github.com/MisterKarott/stratavarious`
+- `scripts/stratavarious-doctor.sh` — vault integrity audit script. Detects: broken MEMORY.md links, orphan notes (in vault but not indexed), dates in future or before 2020, tags not in `#lowercase` format, duplicate titles in the same MEMORY.md section, and frontmatter errors (via validate.sh). Flags: `--json` (machine output), `--fix` (interactive repair for orphans and tag normalization), `--yes` (skip confirmations). Exit codes: 0=healthy, 1=warnings only, 2=errors found.
+- `/strata-doctor` skill — Claude Code skill that invokes the doctor script.
 
 ### Fixed
 - hooks/hooks.json structure: wrap hooks definition under top-level `hooks` key as required by Claude Code plugin runtime. Without this wrapper, plugin installation succeeds but hooks fail to load with a Zod validation error (expected: record, received: undefined).

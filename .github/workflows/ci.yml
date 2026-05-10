@@ -71,3 +71,7 @@ jobs:
       - name: Run E2E tests
         run: bash tests/integration/test-e2e.sh
         timeout-minutes: 5
+
+      - name: Run Doctor tests
+        run: bash tests/integration/test-doctor.sh
+        timeout-minutes: 5
