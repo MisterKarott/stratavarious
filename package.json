@@ -21,6 +21,7 @@
     "eslint-plugin-n": "^16.6.2",
     "eslint-plugin-promise": "^6.1.1"
   },
+  "os": ["darwin", "linux"],
   "files": [
     "hooks/",
     "scripts/",
