@@ -193,6 +193,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `/strata` | Alias for `/stratavarious` |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 | `/strata-pause` | Toggle session capture on/off — pause for exploratory sessions, resume when ready |
+| `/strata-doctor` | Audit vault integrity — broken MEMORY.md links, orphan notes, date issues, malformed tags, duplicate titles |
 
 ## Scripts
 
@@ -202,6 +203,7 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/stratavarious-status.sh` | CLI status check — useful outside Claude Code |
 | `scripts/stratavarious-clean.sh` | Scan the vault for duplicate or stale entries and flag them for review |
 | `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed (CI-friendly) |
+| `scripts/stratavarious-doctor.sh` | Audit vault integrity: broken MEMORY.md links, orphans, dates, tags, duplicates. Flags: `--json`, `--fix`, `--yes`. Exit 0=healthy, 1=warnings, 2=errors |
 | `scripts/stratavarious-write.sh` | File-locked append wrapper — ensures safe concurrent vault writes |
 | `scripts/demo-recording.sh` | Record an Asciinema demo of the StrataVarious workflow |
 
