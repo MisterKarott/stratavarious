@@ -1,0 +1,18 @@
+# StrataVarious vault .gitignore
+# Copy this file to $StrataVarious_HOME/memory/.gitignore
+# when setting up vault sync via git (see docs/sync.md).
+
+# Raw session capture — machine-local, may contain unscrubbed data
+session-buffer.md
+
+# Pause flag — machine-local
+.stratavarious-paused
+
+# Error log — machine-local
+.hook-errors.log
+
+# Lock directory — transient, cleaned up automatically
+.vault.lock.d/
+
+# macOS metadata
+.DS_Store

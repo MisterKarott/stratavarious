@@ -286,6 +286,8 @@ Override by setting the environment variable before starting Claude Code.
 
 **Something looks malformed in the vault.** Run `scripts/stratavarious-validate.sh`. It will exit non-zero and point to the offending file.
 
+**The vault is diverging between machines.** If you use multiple machines, set up vault sync via git — see [`docs/sync.md`](docs/sync.md). The recommended flow is: run `/stratavarious` → commit → push on the source machine, then `git pull --rebase` on the target machine before starting work. MEMORY.md conflicts are safe to resolve by accepting the incoming version and rerunning `scripts/stratavarious-memory-build.sh`.
+
 ## Uninstall
 
 ```bash
@@ -295,9 +297,18 @@ rm -rf ~/.claude/workspace/stratavarious   # optional: removes vault data
 
 No leftover state, no system-level changes.
 
+## Documentation
+
+Detailed documentation is in [`docs/`](docs/):
+
+- [`docs/architecture.md`](docs/architecture.md) — Stop hook pipeline, security guarantees, component contracts
+- [`docs/sync.md`](docs/sync.md) — Vault sync across machines via private git
+- [`docs/contributing.md`](docs/contributing.md) — Local setup, adding categories/patterns/commands
+- [`docs/performance.md`](docs/performance.md) — Benchmark results and thresholds
+
 ## Contributing
 
-Issues and pull requests are welcome. For non-trivial changes, please open an issue first to discuss the direction. Run `scripts/stratavarious-validate.sh` before submitting a PR — CI uses the same check.
+Issues and pull requests are welcome. For non-trivial changes, please open an issue first to discuss the direction. See [`docs/contributing.md`](docs/contributing.md) for the full development guide.
 
 ## License
 
