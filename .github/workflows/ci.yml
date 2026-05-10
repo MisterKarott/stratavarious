@@ -1,6 +1,6 @@
 name: CI
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   lint:
@@ -70,4 +70,23 @@ jobs:
 
       - name: Run E2E tests
         run: bash tests/integration/test-e2e.sh
+        timeout-minutes: 5
+
+      - name: Run Doctor tests
+        run: bash tests/integration/test-doctor.sh
+        timeout-minutes: 5
+
+  perf-check:
+    name: Performance benchmark (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run benchmark
+        run: node tests/bench.mjs
         timeout-minutes: 5

@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
-  <img src="https://img.shields.io/badge/version-2.0.0-6c5ce7?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/github/actions/workflow/status/MisterKarott/stratavarious/CI.yml?branch=develop&label=CI&logo=githubactions&style=for-the-badge" alt="CI">
 </p>
@@ -193,6 +193,9 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `/strata` | Alias for `/stratavarious` |
 | `/stratavarious-status` | Show vault status — entry count, last consolidation date, vault size, recent activity |
 | `/strata-pause` | Toggle session capture on/off — pause for exploratory sessions, resume when ready |
+| `/strata-doctor` | Audit vault integrity — broken MEMORY.md links, orphan notes, date issues, malformed tags, duplicate titles |
+| `/strata-search <query>` | Search vault notes by content and frontmatter — ranked results with recency scoring. Filters: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`. Flags: `--json`, `--limit=N` |
+| `/strata-prune` | Vault hygiene — detect decay, trivial, and duplicate notes. Flags: `--apply`, `--yes`, `--age-days N`, `--json` |
 
 ## Scripts
 
@@ -202,8 +205,73 @@ The vault is designed to be human-readable. Every file is plain Markdown. You ca
 | `scripts/stratavarious-status.sh` | CLI status check — useful outside Claude Code |
 | `scripts/stratavarious-clean.sh` | Scan the vault for duplicate or stale entries and flag them for review |
 | `scripts/stratavarious-validate.sh` | Validate vault note frontmatter — exits 1 if any note is malformed (CI-friendly) |
+| `scripts/stratavarious-doctor.sh` | Audit vault integrity: broken MEMORY.md links, orphans, dates, tags, duplicates. Flags: `--json`, `--fix`, `--yes`. Exit 0=healthy, 1=warnings, 2=errors |
+| `scripts/stratavarious-search.sh` | Full-text vault search with frontmatter filters and recency-based ranking. Flags: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`, `--json`, `--limit=N` |
+| `scripts/stratavarious-prune.sh` | Vault hygiene: detect decay (old unreferenced error notes), trivial notes (<5 lines), and semantic duplicates (Levenshtein/Jaccard title similarity). Dry-run by default. Flags: `--apply`, `--yes`, `--age-days N`, `--json` |
 | `scripts/stratavarious-write.sh` | File-locked append wrapper — ensures safe concurrent vault writes |
 | `scripts/demo-recording.sh` | Record an Asciinema demo of the StrataVarious workflow |
+
+## Searching the vault
+
+`/strata-search` lets you query all vault notes by full text and frontmatter. Results are ranked by `match_count × exp(-age_days / 30)` — recent matches rank higher than old ones.
+
+**Basic search**
+```
+/strata-search rate limiting
+```
+
+**Filter by category and date range**
+```
+/strata-search auth --category=decisions --since=30d
+```
+
+**Find notes by tag, limited to your project**
+```
+/strata-search docker --tag=infra --project=nemty --limit=5
+```
+
+**Search global knowledge only (no project-specific notes)**
+```
+/strata-search retry --global
+```
+
+**Machine-readable JSON output**
+```
+/strata-search api key --json
+```
+
+## Vault hygiene
+
+Over time, vaults accumulate stale, redundant, or trivial notes. Three tools keep it clean:
+
+| Tool | Purpose |
+|------|---------|
+| `/strata-doctor` | Audit structural integrity — broken links, orphans, malformed frontmatter |
+| `/strata-prune` | Detect and remove decay, trivial, and duplicate notes |
+| `/stratavarious-status` | Overview of vault size and recent activity |
+
+**Recommended hygiene workflow:**
+
+```
+# 1. Audit integrity first
+/strata-doctor
+
+# 2. Review pruning candidates (dry-run)
+/strata-prune
+
+# 3. Apply pruning
+/strata-prune --apply
+
+# 4. Fix any orphan references left by pruning
+/strata-doctor --fix
+```
+
+**Prune candidate types:**
+- **Decay** — error notes older than 60 days not referenced by any other note → archived to `vault/_archive/<year>/`
+- **Trivial** — notes with fewer than 5 content lines → deleted
+- **Semantic duplicates** — notes with near-identical titles in the same category (Levenshtein distance < 3 or Jaccard similarity > 70%) → flagged for manual merge
+
+Customize the decay threshold via the `StrataVarious_PRUNE_AGE_DAYS` environment variable.
 
 ## What gets captured
 
@@ -231,12 +299,24 @@ No data ever leaves your machine. There is no telemetry, no analytics, no phone-
 
 StrataVarious includes a built-in secret scanner that runs before any data enters the vault. It detects and redacts:
 
-- API keys (Stripe, OpenAI, Anthropic, AWS, GitHub, Slack, Google)
-- Bearer and Basic authentication headers
-- Database connection strings (MongoDB, PostgreSQL, MySQL, Redis)
-- Passwords in key-value assignments (`password=...`, `api_key: ...`)
-- JWT tokens
-- HTTP basic auth in URLs
+| Pattern | Examples |
+|---|---|
+| Stripe keys | `sk_live_...`, `rk_test_...` |
+| AWS credentials | `AKIA...`, `ASIA...` |
+| GitHub tokens | `ghp_...`, `gho_...`, `github_pat_...` (fine-grained PATs) |
+| Google | API keys (`AIza...`), OAuth access tokens (`ya29....`) |
+| Anthropic keys | `sk-ant-...` |
+| OpenAI keys | `sk-...` |
+| Slack tokens | `xoxb-...`, `xoxa-...`, etc. |
+| JWT tokens | `eyJ...` |
+| HTTP Authorization | Bearer and Basic headers |
+| Database connections | MongoDB, PostgreSQL, MySQL, Redis connection strings |
+| HTTP basic auth | Credentials embedded in URLs |
+| Key-value assignments | `password=...`, `api_key: ...`, `secret=...` (at line start or in YAML) |
+
+**Optional: strict mode.** Set `STRATAVARIOUS_STRICT_SCRUB=1` to also match `password=`, `api_key=`, `secret=`, etc. when they appear mid-line (not just at line start). Higher false-positive rate — phrases like `api_key=none` will be redacted. Disabled by default.
+
+**Optional: entropy scan.** Set `STRATAVARIOUS_ENTROPY_SCAN=1` to detect any string ≥20 characters of token-like characters (`[a-zA-Z0-9+/=_-]`) with Shannon entropy > 4.5 bits/char. Catches unknown token formats at the cost of occasional false positives on long identifiers. Threshold configurable via `STRATAVARIOUS_ENTROPY_THRESHOLD` (default: `4.5`). Disabled by default.
 
 **Important limitations:** The scanner uses pattern matching (regex). It cannot guarantee detection of all possible secret formats, especially:
 - Custom or proprietary key formats
@@ -256,9 +336,12 @@ StrataVarious reduces the risk of secrets entering the vault, but does not elimi
 
 | Variable | Default | Description |
 |---|---|---|
-| `StrataVarious_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
-| `StrataVarious_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
-| `StrataVarious_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
+| `STRATAVARIOUS_HOME` | `~/.claude/workspace/stratavarious` | Root directory for all vault data |
+| `STRATAVARIOUS_MAX_BUFFER` | `512000` (500 KB) | Max size of `session-buffer.md` before truncation |
+| `STRATAVARIOUS_DISABLE` | *(unset)* | Set to `1` to disable the Stop hook entirely (useful in CI) |
+| `STRATAVARIOUS_STRICT_SCRUB` | *(unset)* | Set to `1` to enable strict mode (mid-line key-value matching) |
+| `STRATAVARIOUS_ENTROPY_SCAN` | *(unset)* | Set to `1` to enable Shannon entropy scan for unknown tokens |
+| `STRATAVARIOUS_ENTROPY_THRESHOLD` | `4.5` | Entropy threshold (bits/char) for entropy scan |
 
 Override by setting the environment variable before starting Claude Code.
 
@@ -284,6 +367,8 @@ Override by setting the environment variable before starting Claude Code.
 
 **Something looks malformed in the vault.** Run `scripts/stratavarious-validate.sh`. It will exit non-zero and point to the offending file.
 
+**The vault is diverging between machines.** If you use multiple machines, set up vault sync via git — see [`docs/sync.md`](docs/sync.md). The recommended flow is: run `/stratavarious` → commit → push on the source machine, then `git pull --rebase` on the target machine before starting work. MEMORY.md conflicts are safe to resolve by accepting the incoming version and rerunning `scripts/stratavarious-memory-build.sh`.
+
 ## Uninstall
 
 ```bash
@@ -293,9 +378,18 @@ rm -rf ~/.claude/workspace/stratavarious   # optional: removes vault data
 
 No leftover state, no system-level changes.
 
+## Documentation
+
+Detailed documentation is in [`docs/`](docs/):
+
+- [`docs/architecture.md`](docs/architecture.md) — Stop hook pipeline, security guarantees, component contracts
+- [`docs/sync.md`](docs/sync.md) — Vault sync across machines via private git
+- [`docs/contributing.md`](docs/contributing.md) — Local setup, adding categories/patterns/commands
+- [`docs/performance.md`](docs/performance.md) — Benchmark results and thresholds
+
 ## Contributing
 
-Issues and pull requests are welcome. For non-trivial changes, please open an issue first to discuss the direction. Run `scripts/stratavarious-validate.sh` before submitting a PR — CI uses the same check.
+Issues and pull requests are welcome. For non-trivial changes, please open an issue first to discuss the direction. See [`docs/contributing.md`](docs/contributing.md) for the full development guide.
 
 ## License
 
