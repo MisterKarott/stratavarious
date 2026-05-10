@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `scripts/stratavarious-prune.sh` — vault hygiene script. Detects: decay (error notes older than N days, configurable via `StrataVarious_PRUNE_AGE_DAYS`, default 60, not referenced by any other note → archive to `_archive/<year>/`), trivial notes (<5 content lines → delete), and semantic duplicates (Levenshtein distance < 3 or Jaccard token similarity > 70% on normalized titles within same category → manual merge). Dry-run by default. Flags: `--apply`, `--yes`, `--json`, `--age-days N`. Levenshtein implemented in pure awk (Bash 3.2 compatible, no external deps).
+- `/strata-prune` skill — Claude Code skill that invokes the prune script.
+- README: `## Vault hygiene` section documenting the doctor + prune + status workflow.
+- `tests/integration/test-prune.sh` — 27 integration tests covering all candidate types, dry-run checksum guard, `--apply --yes` archive/delete, JSON output, and error handling.
+- `tests/fixtures/prune-vault/` — test fixtures with decay candidates, trivial notes, duplicate pairs, recent notes, and referenced error notes.
 - `scripts/stratavarious-search.sh` — full-text vault search with frontmatter filters and recency-based ranking. Score = `match_count × exp(-age_days/30)`. Filters: `--category`, `--project`, `--tag`, `--since=Nd`, `--global`. Flags: `--json` (machine output), `--limit=N` (default 10). Uses ripgrep with grep -r fallback.
 - `/strata-search` skill — Claude Code skill that invokes the search script.
 - marketplace.json enabling plugin installation via `claude plugin install github.com/MisterKarott/stratavarious`
