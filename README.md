@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Plugin">
-  <img src="https://img.shields.io/badge/version-2.0.0-6c5ce7?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-6c5ce7?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-00b894?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/github/actions/workflow/status/MisterKarott/stratavarious/CI.yml?branch=develop&label=CI&logo=githubactions&style=for-the-badge" alt="CI">
 </p>

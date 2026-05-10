@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-10
+
 ### Added
 - `scripts/stratavarious-prune.sh` — vault hygiene script. Detects: decay (error notes older than N days, configurable via `StrataVarious_PRUNE_AGE_DAYS`, default 60, not referenced by any other note → archive to `_archive/<year>/`), trivial notes (<5 content lines → delete), and semantic duplicates (Levenshtein distance < 3 or Jaccard token similarity > 70% on normalized titles within same category → manual merge). Dry-run by default. Flags: `--apply`, `--yes`, `--json`, `--age-days N`. Levenshtein implemented in pure awk (Bash 3.2 compatible, no external deps).
 - `/strata-prune` skill — Claude Code skill that invokes the prune script.
@@ -41,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - hooks/hooks.json structure: wrap hooks definition under top-level `hooks` key as required by Claude Code plugin runtime. Without this wrapper, plugin installation succeeds but hooks fail to load with a Zod validation error (expected: record, received: undefined).
 
-## [2.0.0] - 2025-01-XX
+## [2.0.0] - 2025-01-01
 
 ### Added
 - Initial v2.0.0 release as Claude Code plugin
